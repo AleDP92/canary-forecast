@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchModelGrid, type ModelGrid } from '../api/modelGrid'
-import { getLayer, type LayerId } from '../data/mapLayers'
+import { FILL_LAYERS, WIND_SCALES, type LayerId, type WindMode } from '../data/mapLayers'
 
 /**
- * Línea de tiempo de la capa activa del mapa:
- * - Lluvia: radar observado de RainViewer (últimas ~2 h, cada 10 min; sobre
- *   Canarias usa los radares de AEMET) seguido de la precipitación prevista
- *   por el modelo, porque RainViewer no ofrece predicción en su API gratuita.
- * - CAPE y viento: solo previsión del modelo, desde la hora actual.
+ * Línea de tiempo común a las capas activas del mapa (se pueden combinar):
+ * - Con lluvia: radar observado de RainViewer (últimas ~2 h, cada 10 min; sobre
+ *   Canarias usa los radares de AEMET) seguido de la previsión del modelo,
+ *   porque RainViewer no ofrece predicción en su API gratuita.
+ * - Sin lluvia: solo previsión del modelo, desde la hora actual.
  */
 const RAINVIEWER_URL = 'https://api.rainviewer.com/public/weather-maps.json'
 const REFRESH_MS = 5 * 60 * 1000
@@ -19,9 +19,9 @@ export type LayerFrame =
   | { kind: 'observed'; time: number; url: string }
   | { kind: 'forecast'; time: number; gridIndex: number }
 
-export function useMapLayer(layerId: LayerId | null, modelId: string) {
-  const layer = getLayer(layerId)
-  const wantsObserved = !!layer?.observed
+export function useMapLayers(active: LayerId[], windMode: WindMode, modelId: string) {
+  const wantsObserved = active.includes('rain')
+  const anyActive = active.length > 0
   const [observed, setObserved] = useState<LayerFrame[]>([])
   const [observedError, setObservedError] = useState<string | null>(null)
   const [grid, setGrid] = useState<ModelGrid | null>(null)
@@ -30,7 +30,7 @@ export function useMapLayer(layerId: LayerId | null, modelId: string) {
   const [selected, setSelected] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
 
-  // Radar observado: solo con la capa de lluvia, al activarla y cada 5 minutos
+  // Radar observado: solo con la lluvia activa, al activarla y cada 5 minutos
   useEffect(() => {
     if (!wantsObserved) return
     const controller = new AbortController()
@@ -62,13 +62,12 @@ export function useMapLayer(layerId: LayerId | null, modelId: string) {
     }
   }, [wantsObserved])
 
-  // Rejilla del modelo (todas las capas salen de la misma petición)
-  const active = layer != null
+  // Rejilla del modelo: una sola petición para todas las capas, solo si hay alguna activa
   useEffect(() => {
-    if (!active) return
+    if (!anyActive) return
     const controller = new AbortController()
     // Espera breve: si se pasan varios modelos seguidos solo se pide el último
-    // (cada rejilla cuenta como ~200 llamadas en el límite de Open-Meteo)
+    // (cada rejilla cuenta como ~300 llamadas en el límite de Open-Meteo)
     const timer = window.setTimeout(() => {
       fetchModelGrid(modelId, controller.signal)
         .then((g) => {
@@ -83,32 +82,38 @@ export function useMapLayer(layerId: LayerId | null, modelId: string) {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [active, modelId])
+  }, [anyActive, modelId])
 
   const currentGrid = grid?.modelId === modelId ? grid : null
-  const fieldMissing = !!(layer && currentGrid && !currentGrid.fields[layer.field])
+
+  /** Capas activas que el modelo no ofrece (p. ej. CAPE en AIFS o JMA) */
+  const missing = currentGrid
+    ? active.filter((id) => {
+        const field = id === 'wind' ? WIND_SCALES[windMode].field : FILL_LAYERS.find((l) => l.id === id)!.field
+        return !currentGrid.fields[field]
+      })
+    : []
 
   const frames = useMemo<LayerFrame[]>(() => {
-    if (!layer) return []
-    const pastFrames = layer.observed ? observed : []
+    if (!anyActive) return []
+    const pastFrames = wantsObserved ? observed : []
     // Con lluvia se espera al radar para que «ahora» quede bien colocado, salvo que falle
-    if (layer.observed && !pastFrames.length && !observedError) return []
+    if (wantsObserved && !pastFrames.length && !observedError) return []
     const currentHour = Math.floor(Date.now() / 3_600_000) * 3600
     const start = pastFrames.at(-1)?.time ?? currentHour - 1
-    const future: LayerFrame[] =
-      currentGrid && currentGrid.fields[layer.field]
-        ? currentGrid.times
-            .map((time, gridIndex) => ({ kind: 'forecast' as const, time, gridIndex }))
-            .filter((f) => f.time > start && f.time <= start + FORECAST_HOURS * 3600)
-        : []
+    const future: LayerFrame[] = currentGrid
+      ? currentGrid.times
+          .map((time, gridIndex) => ({ kind: 'forecast' as const, time, gridIndex }))
+          .filter((f) => f.time > start && f.time <= start + FORECAST_HOURS * 3600)
+      : []
     return [...pastFrames, ...future]
-  }, [layer, observed, observedError, currentGrid])
+  }, [anyActive, wantsObserved, observed, observedError, currentGrid])
 
   /** «Ahora»: último fotograma observado, o la primera hora prevista */
-  const nowIndex = layer?.observed ? Math.max(0, frames.findLastIndex((f) => f.kind === 'observed')) : 0
+  const nowIndex = wantsObserved ? Math.max(0, frames.findLastIndex((f) => f.kind === 'observed')) : 0
 
   // El fotograma más cercano al instante elegido: así se mantiene la hora al
-  // cambiar de capa o de modelo
+  // activar o quitar capas y al cambiar de modelo
   let index = nowIndex
   if (selected != null && frames.length) {
     let best = Infinity
@@ -133,7 +138,6 @@ export function useMapLayer(layerId: LayerId | null, modelId: string) {
   }, [playing, index, frames, nowIndex])
 
   return {
-    layer,
     frames,
     index,
     nowIndex,
@@ -143,6 +147,6 @@ export function useMapLayer(layerId: LayerId | null, modelId: string) {
     observedError,
     gridError,
     grid: currentGrid,
-    fieldMissing,
+    missing,
   }
 }

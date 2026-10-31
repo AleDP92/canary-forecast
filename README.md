@@ -8,17 +8,15 @@ Web que muestra la previsión del tiempo en tiempo real sobre las Islas Canarias
 - **Selector de modelos**: ECMWF IFS, ECMWF AIFS, ICON, ARPEGE, UKMO, GFS, GEM y JMA.
 - **Panel de detalle** con las condiciones actuales, una gráfica de 48 horas (temperatura y precipitación) y la previsión de 7 días.
 - **Modo comparar**: superpone en la misma gráfica la temperatura de todos los modelos e indica cuánto coinciden entre sí.
-- **Capas animadas en el mapa** con línea de tiempo de 48 h:
+- **Capas en el mapa**, activables por separado y combinables (al abrir no hay ninguna activa), con una línea de tiempo común de 48 h:
   - 🌧️ **Lluvia**: las últimas 2 horas de radar real (RainViewer, con datos de los radares de AEMET) y, a continuación, la precipitación prevista por el modelo.
   - ⚡ **CAPE**: energía disponible para la convección.
-  - 💨 **Viento**: viento medio o rachas.
-  - **Flechas de viento** sobre cualquier capa, de color según la fuerza (verde flojo, amarillo moderado, rojo fuerte).
+  - 💨 **Viento**: flechas de dirección coloreadas por fuerza (verde flojo, amarillo moderado, rojo fuerte), según el viento medio o las rachas.
   - **Datos de un punto**: al pasar el ratón o tocar el mapa se muestran la lluvia, el CAPE, el viento y las rachas de ese lugar en la hora elegida.
-  - Con una capa activa el mapa base pasa a gris para que los colores contrasten.
-  - Al cambiar de capa o de modelo se mantiene la hora elegida.
-- **Pestaña Convección** con CAPE, CIN, Índice K, Total Totals, Lifted Index, temperatura a 500 hPa (detección de DANA) e isocero. Muestra el valor más desfavorable, su nivel de riesgo y una gráfica con umbrales, comparable entre modelos.
+  - Con alguna capa activa el mapa base pasa a gris para que los colores contrasten.
+  - Al activar o quitar capas, o al cambiar de modelo, se mantiene la hora elegida.
 - Se actualiza sola (el mapa cada 10 min, la previsión cada 30 min).
-- El enlace guarda el modelo y la localidad elegidos (`?modelo=gfs_seamless&lugar=las-palmas`), así que se puede compartir.
+- El enlace guarda el modelo y la localidad elegidos (`?modelo=gfs_seamless&lugar=las-palmas`), así que se puede compartir. Las capas del mapa no se guardan: siempre se abre sin ninguna.
 
 ## Fuentes de datos
 

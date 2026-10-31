@@ -1,5 +1,5 @@
 import { GRID, GRID_COLS, GRID_ROWS } from '../api/modelGrid'
-import { colorFor, type MapLayer } from '../data/mapLayers'
+import { colorFor, type FillLayer } from '../data/mapLayers'
 
 /** Píxeles por celda de la rejilla: la interpolación bilineal suaviza el resultado */
 const SCALE = 10
@@ -18,7 +18,7 @@ export const GRID_BOUNDS: [[number, number], [number, number]] = [
 const imageCache = new WeakMap<Float32Array, Map<string, string>>()
 
 /** Dibuja un instante de una variable de la rejilla como imagen PNG (data URL) interpolada */
-export function renderGridFrame(values: Float32Array, layer: MapLayer): string {
+export function renderGridFrame(values: Float32Array, layer: FillLayer): string {
   let perLayer = imageCache.get(values)
   const cached = perLayer?.get(layer.id)
   if (cached) return cached

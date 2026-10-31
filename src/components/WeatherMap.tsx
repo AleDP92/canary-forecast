@@ -13,10 +13,10 @@ import {
   useMapEvents,
 } from 'react-leaflet'
 import type { CurrentConditions } from '../api/openMeteo'
-import { GRID, GRID_COLS, GRID_ROWS, nearestGridIndex, type ModelGrid } from '../api/modelGrid'
+import { GRID, GRID_COLS, GRID_ROWS, nearestGridIndex, type GridField, type ModelGrid } from '../api/modelGrid'
 import { LOCATIONS, MAP_BOUNDS, REGION_BOUNDS, type Location } from '../data/locations'
 import { describeWeather } from '../data/weatherCodes'
-import { arrowColor, type MapLayer } from '../data/mapLayers'
+import { FILL_LAYERS, WIND_SCALES, windColor, type LayerId, type WindMode } from '../data/mapLayers'
 import { RADAR_MAX_NATIVE_ZOOM, type LayerFrame } from '../hooks/useMapLayer'
 import { GRID_BOUNDS, renderGridFrame } from '../utils/gridImage'
 
@@ -27,12 +27,12 @@ interface Props {
 }
 
 interface LayerProps {
-  layer: MapLayer | null
+  /** Capas activas (combinables) */
+  active: LayerId[]
+  windMode: WindMode
   frames: LayerFrame[]
   frameIndex: number
   grid: ModelGrid | null
-  /** Flechas de viento sobre capas que no son de viento */
-  showArrows: boolean
 }
 
 interface MapProps extends Props, LayerProps {
@@ -47,9 +47,20 @@ const ARROWS_HEIGHT = (mercY(GRID.latMax) - mercY(GRID.latMin)) / STEP_RAD
 
 /**
  * Flechas de viento en cada punto de la rejilla (SVG: nítidas a cualquier zoom).
- * El color indica la fuerza del viento medio: verde flojo, amarillo moderado, rojo fuerte.
+ * Dirección y longitud según el viento medio; color según la escala elegida
+ * (viento medio o rachas): verde flojo, amarillo moderado, rojo fuerte.
  */
-function WindArrows({ speed, direction }: { speed: Float32Array; direction: Float32Array }) {
+function WindArrows({
+  speed,
+  colorBy,
+  direction,
+  mode,
+}: {
+  speed: Float32Array
+  colorBy: Float32Array
+  direction: Float32Array
+  mode: WindMode
+}) {
   const map = useMapEvents({ zoomend: () => setZoom(map.getZoom()) })
   const [zoom, setZoom] = useState(() => map.getZoom())
   // Con el mapa muy alejado, una flecha de cada dos para que no se amontonen
@@ -68,7 +79,7 @@ function WindArrows({ speed, direction }: { speed: Float32Array; direction: Floa
       arrows.push(
         <g key={i} transform={`translate(${c} ${y}) rotate(${angle})`}>
           <path className="wind-arrow__halo" d={d} />
-          <path className="wind-arrow" d={d} style={{ stroke: arrowColor(speed[i]) }} />
+          <path className="wind-arrow" d={d} style={{ stroke: windColor(mode, colorBy[i]) }} />
         </g>,
       )
     }
@@ -85,38 +96,51 @@ function WindArrows({ speed, direction }: { speed: Float32Array; direction: Floa
 }
 
 /**
- * Los fotogramas de radar observado se montan todos a la vez y solo el actual
- * es visible, así ya están cargados al animar. Los de previsión se dibujan al
- * vuelo a partir de la rejilla del modelo.
+ * Dibuja las capas activas en el instante elegido. Los fotogramas de radar
+ * observado se montan todos a la vez y solo el actual es visible, así ya están
+ * cargados al animar. La previsión se dibuja al vuelo a partir de la rejilla.
  */
-function LayerFrames({ layer, frames, frameIndex, grid, showArrows }: LayerProps) {
-  if (!layer) return null
+function LayerFrames({ active, windMode, frames, frameIndex, grid }: LayerProps) {
   const current = frames[frameIndex]
-  const values = current?.kind === 'forecast' ? grid?.fields[layer.field]?.[current.gridIndex] : undefined
-  const imageUrl = values ? renderGridFrame(values, layer) : null
-  // El viento se toma de la hora prevista más cercana (también sobre el radar observado)
-  const windIndex = current && grid ? (current.kind === 'forecast' ? current.gridIndex : nearestGridIndex(grid, current.time)) : -1
-  const speed = windIndex >= 0 ? grid?.fields.wind_speed_10m?.[windIndex] : undefined
-  const direction = windIndex >= 0 ? grid?.fields.wind_direction_10m?.[windIndex] : undefined
+  if (!current) return null
+  // Hora de la rejilla: la del fotograma, o la prevista más cercana sobre el radar observado
+  const gi = grid ? (current.kind === 'forecast' ? current.gridIndex : nearestGridIndex(grid, current.time)) : -1
+  const field = (f: GridField) => (gi >= 0 ? grid?.fields[f]?.[gi] : undefined)
+
+  // CAPE debajo y lluvia encima, para que la lluvia se lea sobre el CAPE
+  const fills = [...FILL_LAYERS].reverse().filter((l) => active.includes(l.id))
+  const showRadar = active.includes('rain')
+  const speed = field('wind_speed_10m')
+  const direction = field('wind_direction_10m')
+  const colorBy = field(WIND_SCALES[windMode].field)
 
   return (
     <>
-      {layer.observed &&
+      {showRadar &&
         frames.map((f, i) =>
           f.kind === 'observed' ? (
             <TileLayer
               key={f.url}
               url={f.url}
               opacity={i === frameIndex ? 0.95 : 0}
-              zIndex={10}
+              zIndex={11}
               maxNativeZoom={RADAR_MAX_NATIVE_ZOOM}
               maxZoom={18}
               attribution='Radar: <a href="https://www.rainviewer.com/">RainViewer</a> · AEMET'
             />
           ) : null,
         )}
-      {imageUrl && <ImageOverlay url={imageUrl} bounds={GRID_BOUNDS} opacity={1} zIndex={11} />}
-      {(layer.arrows || showArrows) && speed && direction && <WindArrows speed={speed} direction={direction} />}
+      {fills.map((layer, k) => {
+        // Sobre el radar observado la lluvia ya la pinta el radar
+        if (layer.observed && current.kind === 'observed') return null
+        const values = field(layer.field)
+        return values ? (
+          <ImageOverlay key={layer.id} url={renderGridFrame(values, layer)} bounds={GRID_BOUNDS} opacity={1} zIndex={10 + k} />
+        ) : null
+      })}
+      {active.includes('wind') && speed && direction && colorBy && (
+        <WindArrows speed={speed} colorBy={colorBy} direction={direction} mode={windMode} />
+      )}
     </>
   )
 }
@@ -217,7 +241,7 @@ function LimitToRegion() {
   return null
 }
 
-export function WeatherMap({ layer, frames, frameIndex, grid, showArrows, probe, onProbe, ...props }: MapProps) {
+export function WeatherMap({ active, windMode, frames, frameIndex, grid, probe, onProbe, ...props }: MapProps) {
   return (
     <MapContainer
       bounds={MAP_BOUNDS}
@@ -234,8 +258,8 @@ export function WeatherMap({ layer, frames, frameIndex, grid, showArrows, probe,
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <LayerFrames layer={layer} frames={frames} frameIndex={frameIndex} grid={grid} showArrows={showArrows} />
-      {layer && <MapProbe probe={probe} onProbe={onProbe} />}
+      <LayerFrames active={active} windMode={windMode} frames={frames} frameIndex={frameIndex} grid={grid} />
+      {active.length > 0 && <MapProbe probe={probe} onProbe={onProbe} />}
       <Markers {...props} />
     </MapContainer>
   )
