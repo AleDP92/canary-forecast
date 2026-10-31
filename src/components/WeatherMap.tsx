@@ -1,6 +1,6 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   CircleMarker,
   ImageOverlay,
@@ -9,11 +9,12 @@ import {
   SVGOverlay,
   TileLayer,
   Tooltip,
+  useMap,
   useMapEvents,
 } from 'react-leaflet'
 import type { CurrentConditions } from '../api/openMeteo'
 import { GRID, GRID_COLS, GRID_ROWS, nearestGridIndex, type ModelGrid } from '../api/modelGrid'
-import { LOCATIONS, MAP_BOUNDS, type Location } from '../data/locations'
+import { LOCATIONS, MAP_BOUNDS, REGION_BOUNDS, type Location } from '../data/locations'
 import { describeWeather } from '../data/weatherCodes'
 import { arrowColor, type MapLayer } from '../data/mapLayers'
 import { RADAR_MAX_NATIVE_ZOOM, type LayerFrame } from '../hooks/useMapLayer'
@@ -199,9 +200,35 @@ function Markers({ current, selectedId, onSelect }: Props) {
   )
 }
 
+/**
+ * Impide alejar el mapa más allá de la zona de Canarias: el zoom mínimo es el
+ * que muestra la zona completa. Se recalcula si cambia el tamaño del mapa.
+ */
+function LimitToRegion() {
+  const map = useMap()
+  useEffect(() => {
+    const update = () => map.setMinZoom(map.getBoundsZoom(REGION_BOUNDS))
+    update()
+    map.on('resize', update)
+    return () => {
+      map.off('resize', update)
+    }
+  }, [map])
+  return null
+}
+
 export function WeatherMap({ layer, frames, frameIndex, grid, showArrows, probe, onProbe, ...props }: MapProps) {
   return (
-    <MapContainer bounds={MAP_BOUNDS} boundsOptions={{ padding: [24, 24] }} minZoom={6} className="map" scrollWheelZoom>
+    <MapContainer
+      bounds={MAP_BOUNDS}
+      boundsOptions={{ padding: [24, 24] }}
+      maxBounds={REGION_BOUNDS}
+      maxBoundsViscosity={1}
+      zoomSnap={0.25}
+      className="map"
+      scrollWheelZoom
+    >
+      <LimitToRegion />
       <TileLayer
         className="basemap"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

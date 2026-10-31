@@ -4,7 +4,7 @@ Web que muestra la previsión del tiempo en tiempo real sobre las Islas Canarias
 
 ## Funcionalidades
 
-- **Mapa de las islas** con la temperatura y el estado del cielo actuales en 16 localidades. Al acercar el mapa aparecen más puntos.
+- **Mapa de Canarias**, limitado a las islas más unos 100 km alrededor (no se puede alejar ni desplazar fuera), con la temperatura y el estado del cielo actuales en 16 localidades. Al acercar el mapa aparecen más puntos.
 - **Selector de modelos**: ECMWF IFS, ECMWF AIFS, ICON, ARPEGE, UKMO, GFS, GEM y JMA.
 - **Panel de detalle** con las condiciones actuales, una gráfica de 48 horas (temperatura y precipitación) y la previsión de 7 días.
 - **Modo comparar**: superpone en la misma gráfica la temperatura de todos los modelos e indica cuánto coinciden entre sí.
@@ -24,7 +24,7 @@ Web que muestra la previsión del tiempo en tiempo real sobre las Islas Canarias
 
 - [Open-Meteo](https://open-meteo.com/) para los modelos: gratuita, sin clave de API, licencia CC BY 4.0.
 - [RainViewer](https://www.rainviewer.com/api.html) para el radar: gratuita. Solo ofrece las últimas ~2 h, sin predicción, con zoom nativo máximo 7 (a más zoom la imagen se amplía).
-- Las capas de previsión salen de una rejilla de 207 puntos (cada 0,25°) de Open-Meteo, interpolada y difuminada en los bordes. Open-Meteo cuenta cada punto como una llamada (límite ~600/min por usuario), pero no cada variable, así que lluvia, CAPE y viento se piden juntos. La rejilla se guarda 15 min en memoria y solo se pide al activar una capa. ECMWF AIFS y JMA no ofrecen CAPE.
+- Las capas de previsión salen de una rejilla de 312 puntos (cada 0,3°, cubriendo toda la zona del mapa) de Open-Meteo, interpolada y difuminada en los bordes. Open-Meteo cuenta cada punto como una llamada (límite ~600/min por usuario), pero no cada variable, así que lluvia, CAPE y viento se piden juntos. La rejilla se guarda 15 min en memoria y solo se pide al activar una capa. ECMWF AIFS y JMA no ofrecen CAPE.
 
 ### Índices por modelo
 

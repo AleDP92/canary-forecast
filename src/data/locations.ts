@@ -42,3 +42,12 @@ export const MAP_BOUNDS: [[number, number], [number, number]] = [
   [27.62, -18.2],
   [29.3, -13.4],
 ]
+
+/**
+ * Zona máxima del mapa: las islas más unos 100 km alrededor
+ * (al este llega a rozar la costa africana). No se puede salir de ella.
+ */
+export const REGION_BOUNDS: [[number, number], [number, number]] = [
+  [26.75, -19.25],
+  [30.35, -12.35],
+]
