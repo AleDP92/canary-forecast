@@ -169,25 +169,57 @@
   width: 100%;
 }
 
-.radar-toggle {
-  padding: 6px 10px;
+.layer-picker {
+  display: inline-flex;
+  flex: none;
   border-radius: 8px;
+  overflow: hidden;
   border: 1px solid var(--border);
   background: var(--surface);
+}
+
+.layer-toggle {
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
   color: var(--text);
   cursor: pointer;
   white-space: nowrap;
 }
 
-.radar-toggle--active {
+.layer-toggle + .layer-toggle {
+  border-left: 1px solid var(--border);
+}
+
+.layer-toggle--active {
   background: #0369a1;
-  border-color: #0369a1;
   color: #fff;
   font-weight: 600;
 }
 
-.map-wrap--radar .temp-marker {
+.map-wrap--layer .temp-marker {
   opacity: 0.75;
+}
+
+/* Flechas de viento: grosor fijo en pantalla aunque se escale el SVG */
+.wind-arrows path {
+  fill: none;
+  stroke: #0f172a;
+  stroke-opacity: 0.65;
+  stroke-width: 1.4px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+@media (max-width: 520px) {
+  .map-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .layer-toggle {
+    padding: 6px 8px;
+  }
 }
 
 .radar-controls {
@@ -313,19 +345,33 @@
   color: var(--error-text);
 }
 
-.radar-legend {
+.layer-legend {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
 }
 
-.radar-legend i {
-  width: 90px;
+.layer-legend__bar {
+  position: relative;
+  width: 180px;
+  height: 22px;
+}
+
+.layer-legend__bar i {
+  display: block;
   height: 8px;
   border-radius: 4px;
-  /* Colores muestreados del esquema «Universal Blue» de RainViewer */
-  background: linear-gradient(90deg, #e6dcb4, #80d0e0, #10a0e0, #0070a0, #004070);
+}
+
+.layer-legend__bar span {
+  position: absolute;
+  top: 9px;
+  color: var(--muted);
+}
+
+.layer-legend__unit {
+  padding-top: 1px;
 }
 
 .location-picker select {

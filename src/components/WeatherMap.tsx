@@ -1,13 +1,14 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useMemo, useState } from 'react'
-import { ImageOverlay, MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
+import { ImageOverlay, MapContainer, Marker, SVGOverlay, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
 import type { CurrentConditions } from '../api/openMeteo'
-import type { PrecipGrid } from '../api/precipGrid'
+import { GRID, GRID_COLS, GRID_ROWS, type ModelGrid } from '../api/modelGrid'
 import { LOCATIONS, MAP_BOUNDS, type Location } from '../data/locations'
 import { describeWeather } from '../data/weatherCodes'
-import { RADAR_MAX_NATIVE_ZOOM, type RadarFrame } from '../hooks/useRadar'
-import { PRECIP_BOUNDS, renderPrecipFrame } from '../utils/precipImage'
+import type { MapLayer } from '../data/mapLayers'
+import { RADAR_MAX_NATIVE_ZOOM, type LayerFrame } from '../hooks/useMapLayer'
+import { GRID_BOUNDS, renderGridFrame } from '../utils/gridImage'
 
 interface Props {
   current: Record<string, CurrentConditions> | null
@@ -16,36 +17,83 @@ interface Props {
 }
 
 interface MapProps extends Props {
-  /** Fotogramas del radar; vacío si el radar está desactivado */
-  radarFrames: RadarFrame[]
-  radarIndex: number
-  precipGrid: PrecipGrid | null
+  layer: MapLayer | null
+  frames: LayerFrame[]
+  frameIndex: number
+  grid: ModelGrid | null
+}
+
+// Proyección de Mercator (en radianes) para colocar las flechas sobre la rejilla
+const mercY = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360))
+const STEP_RAD = (GRID.step * Math.PI) / 180
+const ARROWS_HEIGHT = (mercY(GRID.latMax) - mercY(GRID.latMin)) / STEP_RAD
+
+/** Flechas de dirección del viento en cada punto de la rejilla (SVG: nítidas a cualquier zoom) */
+function WindArrows({ speed, direction }: { speed: Float32Array; direction: Float32Array }) {
+  const map = useMapEvents({ zoomend: () => setZoom(map.getZoom()) })
+  const [zoom, setZoom] = useState(() => map.getZoom())
+  // Con el mapa muy alejado, una flecha de cada dos para que no se amontonen
+  const stride = zoom <= 6 ? 2 : 1
+  const arrows = []
+  for (let r = 0; r < GRID_ROWS; r += stride) {
+    const y = (mercY(GRID.latMax) - mercY(GRID.latMin + r * GRID.step)) / STEP_RAD
+    for (let c = 0; c < GRID_COLS; c += stride) {
+      const i = r * GRID_COLS + c
+      if (speed[i] < 3) continue
+      // La dirección meteorológica es de dónde viene: la flecha apunta hacia donde va
+      const angle = (direction[i] + 180) % 360
+      const len = (0.25 + Math.min(speed[i], 60) / 200) * stride
+      arrows.push(
+        <path
+          key={i}
+          d={`M0 ${len} L0 ${-len} M${-0.13 * stride} ${-len + 0.17 * stride} L0 ${-len} L${0.13 * stride} ${-len + 0.17 * stride}`}
+          transform={`translate(${c} ${y}) rotate(${angle})`}
+        />,
+      )
+    }
+  }
+  return (
+    <SVGOverlay
+      bounds={GRID_BOUNDS}
+      attributes={{ viewBox: `0 0 ${GRID_COLS - 1} ${ARROWS_HEIGHT}`, preserveAspectRatio: 'none' }}
+      zIndex={12}
+    >
+      <g className="wind-arrows">{arrows}</g>
+    </SVGOverlay>
+  )
 }
 
 /**
- * Los fotogramas observados se montan todos a la vez y solo el actual es
- * visible, así las imágenes ya están cargadas cuando se anima. Los de
- * previsión se dibujan al vuelo a partir de la rejilla del modelo.
+ * Los fotogramas de radar observado se montan todos a la vez y solo el actual
+ * es visible, así ya están cargados al animar. Los de previsión se dibujan al
+ * vuelo a partir de la rejilla del modelo.
  */
-function RadarLayers({ frames, index, grid }: { frames: RadarFrame[]; index: number; grid: PrecipGrid | null }) {
-  const current = frames[index]
-  const forecastUrl = current?.kind === 'forecast' && grid ? renderPrecipFrame(grid, current.gridIndex) : null
+function LayerFrames({ layer, frames, frameIndex, grid }: Omit<MapProps, keyof Props>) {
+  if (!layer) return null
+  const current = frames[frameIndex]
+  const values = current?.kind === 'forecast' ? grid?.fields[layer.field]?.[current.gridIndex] : undefined
+  const imageUrl = values ? renderGridFrame(values, layer) : null
+  const speed = current?.kind === 'forecast' ? grid?.fields.wind_speed_10m?.[current.gridIndex] : undefined
+  const direction = current?.kind === 'forecast' ? grid?.fields.wind_direction_10m?.[current.gridIndex] : undefined
+
   return (
     <>
-      {frames.map((f, i) =>
-        f.kind === 'observed' ? (
-          <TileLayer
-            key={f.url}
-            url={f.url}
-            opacity={i === index ? 0.8 : 0}
-            zIndex={10}
-            maxNativeZoom={RADAR_MAX_NATIVE_ZOOM}
-            maxZoom={18}
-            attribution='Radar: <a href="https://www.rainviewer.com/">RainViewer</a> · AEMET'
-          />
-        ) : null,
-      )}
-      {forecastUrl && <ImageOverlay url={forecastUrl} bounds={PRECIP_BOUNDS} opacity={0.85} zIndex={11} />}
+      {layer.observed &&
+        frames.map((f, i) =>
+          f.kind === 'observed' ? (
+            <TileLayer
+              key={f.url}
+              url={f.url}
+              opacity={i === frameIndex ? 0.8 : 0}
+              zIndex={10}
+              maxNativeZoom={RADAR_MAX_NATIVE_ZOOM}
+              maxZoom={18}
+              attribution='Radar: <a href="https://www.rainviewer.com/">RainViewer</a> · AEMET'
+            />
+          ) : null,
+        )}
+      {imageUrl && <ImageOverlay url={imageUrl} bounds={GRID_BOUNDS} opacity={0.85} zIndex={11} />}
+      {layer.arrows && speed && direction && <WindArrows speed={speed} direction={direction} />}
     </>
   )
 }
@@ -106,14 +154,14 @@ function Markers({ current, selectedId, onSelect }: Props) {
   )
 }
 
-export function WeatherMap({ radarFrames, radarIndex, precipGrid, ...props }: MapProps) {
+export function WeatherMap({ layer, frames, frameIndex, grid, ...props }: MapProps) {
   return (
     <MapContainer bounds={MAP_BOUNDS} boundsOptions={{ padding: [24, 24] }} minZoom={6} className="map" scrollWheelZoom>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <RadarLayers frames={radarFrames} index={radarIndex} grid={precipGrid} />
+      <LayerFrames layer={layer} frames={frames} frameIndex={frameIndex} grid={grid} />
       <Markers {...props} />
     </MapContainer>
   )
