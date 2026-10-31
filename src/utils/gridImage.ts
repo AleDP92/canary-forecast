@@ -4,7 +4,7 @@ import { colorFor, type MapLayer } from '../data/mapLayers'
 /** Píxeles por celda de la rejilla: la interpolación bilineal suaviza el resultado */
 const SCALE = 10
 /** Celdas sobre las que se difumina el borde de la rejilla para que no se vea el rectángulo */
-const EDGE_FADE = 3.5
+const EDGE_FADE = 2
 
 const smoothstep = (x: number) => (x >= 1 ? 1 : x <= 0 ? 0 : x * x * (3 - 2 * x))
 

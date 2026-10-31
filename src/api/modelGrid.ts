@@ -1,20 +1,19 @@
+import { REGION_BOUNDS } from '../data/locations'
+
 /**
  * Rejilla de variables previstas sobre Canarias (lluvia, CAPE, viento), a
  * partir de Open-Meteo. Alimenta las capas del mapa.
  *
  * Open-Meteo cuenta cada punto como una llamada (límite ~600/min por usuario),
  * pero no cada variable: por eso todas las capas salen de una sola petición.
- * La rejilla es de 0,25° (~25 km, parecida a la resolución de los modelos
- * globales) y se guarda en memoria unos minutos.
+ * La rejilla cubre la zona del mapa (islas + ~100 km) cada 0,3° (~33 km,
+ * parecido a la resolución de los modelos globales): 13 × 24 = 312 puntos.
+ * Se guarda en memoria unos minutos.
  */
 
-export const GRID = {
-  latMin: 27.5,
-  latMax: 29.5,
-  lonMin: -18.5,
-  lonMax: -13.0,
-  step: 0.25,
-}
+const [[latMin, lonMin], [latMax, lonMax]] = REGION_BOUNDS
+
+export const GRID = { latMin, latMax, lonMin, lonMax, step: 0.3 }
 
 export const GRID_ROWS = Math.round((GRID.latMax - GRID.latMin) / GRID.step) + 1
 export const GRID_COLS = Math.round((GRID.lonMax - GRID.lonMin) / GRID.step) + 1
