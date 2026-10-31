@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Vuelve a publicar la web para renovar los resúmenes con IA:
+  # 06:30, 12:30 y 18:30 en Canarias en invierno (una hora más en verano)
+  schedule:
+    - cron: '30 6,12,18 * * *'
 
 permissions:
   contents: read
@@ -17,6 +21,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Secreto del repo (Settings → Secrets and variables → Actions)
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # Variable opcional del repo para cambiar de modelo
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,6 +34,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # Si falla (sin clave, cuota agotada…), la web se publica igual sin resúmenes
+      - name: Generar resúmenes con IA
+        if: env.GEMINI_API_KEY != ''
+        continue-on-error: true
+        run: node scripts/generate-summaries.mjs dist/data/resumenes.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
