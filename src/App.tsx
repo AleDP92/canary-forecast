@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { LocationPanel } from './components/LocationPanel'
 import { ModelSelector } from './components/ModelSelector'
-import { RadarControls } from './components/RadarControls'
+import { LayerControls } from './components/LayerControls'
 import { WeatherMap } from './components/WeatherMap'
 import { DEFAULT_LOCATION_ID, LOCATIONS } from './data/locations'
 import { DEFAULT_MODEL_ID, MODELS, getModel } from './data/models'
-import { useRadar } from './hooks/useRadar'
+import { MAP_LAYERS, getLayer, layerFromSlug, type LayerId } from './data/mapLayers'
+import { useMapLayer } from './hooks/useMapLayer'
 import { useCurrentForAll, useForecast } from './hooks/useWeather'
 import { formatClock } from './utils/time'
 import './App.css'
@@ -25,17 +26,29 @@ export default function App() {
   )
   const location = LOCATIONS.find((l) => l.id === locationId) ?? LOCATIONS[0]
 
-  const [radarOn, setRadarOn] = useState(() => new URLSearchParams(window.location.search).has('radar'))
-  const radar = useRadar(radarOn, modelId)
+  const [layerId, setLayerId] = useState<LayerId | null>(() => {
+    const params = new URLSearchParams(window.location.search)
+    // `?radar=1` era el enlace antiguo de la capa de lluvia
+    return layerFromSlug(params.get('capa')) ?? (params.has('radar') ? 'rain' : null)
+  })
+  const mapLayer = useMapLayer(layerId, modelId)
+
+  /** Pulsar la capa activa la desactiva; al activar una se reproduce la animación */
+  const toggleLayer = (id: LayerId) => {
+    const isActive = layerId === id || (id === 'wind' && layerId === 'gusts')
+    setLayerId(isActive ? null : id)
+    mapLayer.setPlaying(!isActive)
+  }
 
   const current = useCurrentForAll(LOCATIONS, modelId)
   const forecast = useForecast(location, ALL_MODEL_IDS)
 
   useEffect(() => {
     const params = new URLSearchParams({ modelo: modelId, lugar: locationId })
-    if (radarOn) params.set('radar', '1')
+    const layer = getLayer(layerId)
+    if (layer) params.set('capa', layer.slug)
     window.history.replaceState(null, '', `?${params}`)
-  }, [modelId, locationId, radarOn])
+  }, [modelId, locationId, layerId])
 
   const reloadAll = () => {
     current.reload()
@@ -66,27 +79,33 @@ export default function App() {
       {current.error && <p className="error">No se pudieron cargar los datos del mapa: {current.error}</p>}
 
       <main className="layout">
-        <div className={`map-wrap${radarOn ? ' map-wrap--radar' : ''}`}>
+        <div className={`map-wrap${layerId ? ' map-wrap--layer' : ''}`}>
           <WeatherMap
             current={current.data}
             selectedId={locationId}
             onSelect={setLocationId}
-            radarFrames={radarOn ? radar.frames : []}
-            radarIndex={radar.index}
-            precipGrid={radar.grid}
+            layer={mapLayer.layer}
+            frames={mapLayer.frames}
+            frameIndex={mapLayer.index}
+            grid={mapLayer.grid}
           />
           <div className="map-toolbar">
-            <button
-              type="button"
-              className={`radar-toggle${radarOn ? ' radar-toggle--active' : ''}`}
-              aria-pressed={radarOn}
-              onClick={() => {
-                setRadarOn(!radarOn)
-                radar.setPlaying(!radarOn)
-              }}
-            >
-              🌧️ Radar
-            </button>
+            <div className="layer-picker" role="group" aria-label="Capa del mapa">
+              {MAP_LAYERS.filter((l) => l.id !== 'gusts').map((l) => {
+                const active = layerId === l.id || (l.id === 'wind' && layerId === 'gusts')
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className={`layer-toggle${active ? ' layer-toggle--active' : ''}`}
+                    aria-pressed={active}
+                    onClick={() => toggleLayer(l.id)}
+                  >
+                    <span aria-hidden="true">{l.icon}</span> {l.name}
+                  </button>
+                )
+              })}
+            </div>
             <label className="location-picker">
               <span className="sr-only">Ubicación</span>
               <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
@@ -102,16 +121,19 @@ export default function App() {
               </select>
             </label>
           </div>
-          {radarOn && (
-            <RadarControls
-              frames={radar.frames}
-              index={radar.index}
-              nowIndex={radar.nowIndex}
-              onIndex={radar.setIndex}
-              playing={radar.playing}
-              onPlaying={radar.setPlaying}
-              error={radar.error}
-              forecastError={radar.forecastError}
+          {mapLayer.layer && (
+            <LayerControls
+              layer={mapLayer.layer}
+              onLayer={setLayerId}
+              frames={mapLayer.frames}
+              index={mapLayer.index}
+              nowIndex={mapLayer.nowIndex}
+              onIndex={mapLayer.setIndex}
+              playing={mapLayer.playing}
+              onPlaying={mapLayer.setPlaying}
+              observedError={mapLayer.observedError}
+              gridError={mapLayer.gridError}
+              fieldMissing={mapLayer.fieldMissing}
               modelName={getModel(modelId).name}
             />
           )}
