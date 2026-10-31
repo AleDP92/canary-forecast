@@ -1,22 +1,28 @@
 import { useState } from 'react'
 import type { CurrentConditions, ModelSeries } from '../api/openMeteo'
-import type { Location } from '../data/locations'
+import { LOCATIONS, type Location } from '../data/locations'
 import { MODELS, getModel } from '../data/models'
 import { describeWeather, windDirection } from '../data/weatherCodes'
 import { useIndexSources } from '../hooks/useWeather'
 import { currentHourIndex, formatDay } from '../utils/time'
+import { AiSummary } from './AiSummary'
 import { ConvectionPanel } from './ConvectionPanel'
+import type { AiSummaries } from '../hooks/useAiSummaries'
 import { ForecastChart, type ChartSeries } from './ForecastChart'
 
 interface Props {
   location: Location
+  onLocationChange: (id: string) => void
   modelId: string
   current: CurrentConditions | undefined
   forecast: Record<string, ModelSeries> | null
   forecastError: string | null
+  /** Resúmenes con IA; null si no hay (o no son de hoy) */
+  aiSummaries: AiSummaries | null
 }
 
 const HOURS = 48
+const ISLANDS = [...new Set(LOCATIONS.map((l) => l.island))]
 const ALL_MODEL_IDS = MODELS.map((m) => m.id)
 type Tab = 'general' | 'convection'
 const fmt = (v: number | null | undefined, digits = 0) => (v == null ? '–' : v.toFixed(digits))
@@ -32,7 +38,7 @@ function modelAgreement(forecast: Record<string, ModelSeries>) {
   return { spread, level, count: maxes.length }
 }
 
-export function LocationPanel({ location, modelId, current, forecast, forecastError }: Props) {
+export function LocationPanel({ location, onLocationChange, modelId, current, forecast, forecastError, aiSummaries }: Props) {
   const [compare, setCompare] = useState(false)
   const [tab, setTab] = useState<Tab>('general')
   // Los índices solo se descargan al abrir la pestaña de convección
@@ -70,9 +76,22 @@ export function LocationPanel({ location, modelId, current, forecast, forecastEr
   return (
     <aside className="panel">
       <header className="panel__header">
-        <div>
-          <h2>{location.name}</h2>
-          <p className="muted">{location.island}</p>
+        <div className="panel__place">
+          <label className="place-picker">
+            <span className="sr-only">Zona</span>
+            <select value={location.id} onChange={(e) => onLocationChange(e.target.value)}>
+              {ISLANDS.map((island) => (
+                <optgroup key={island} label={island}>
+                  {LOCATIONS.filter((l) => l.island === island).map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+          <p className="muted">{location.island} · elige otra zona aquí o en el mapa</p>
         </div>
         <span className="badge" style={{ background: model.color }}>
           {model.name}
@@ -118,6 +137,8 @@ export function LocationPanel({ location, modelId, current, forecast, forecastEr
           </div>
         </dl>
       </section>
+
+      {aiSummaries && <AiSummary summaries={aiSummaries} locationId={location.id} />}
 
       <div className="tabs" role="tablist" aria-label="Vista">
         <button type="button" role="tab" aria-selected={tab === 'general'} onClick={() => setTab('general')}>

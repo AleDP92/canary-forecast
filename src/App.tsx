@@ -7,6 +7,7 @@ import { DEFAULT_LOCATION_ID, LOCATIONS } from './data/locations'
 import { DEFAULT_MODEL_ID, MODELS, getModel } from './data/models'
 import { LAYER_BUTTONS, type LayerId, type WindMode } from './data/mapLayers'
 import { useMapLayers } from './hooks/useMapLayer'
+import { useAiSummaries } from './hooks/useAiSummaries'
 import { useCurrentForAll, useForecast } from './hooks/useWeather'
 import { formatClock } from './utils/time'
 import './App.css'
@@ -43,6 +44,7 @@ export default function App() {
 
   const current = useCurrentForAll(LOCATIONS, modelId)
   const forecast = useForecast(location, ALL_MODEL_IDS)
+  const aiSummaries = useAiSummaries()
 
   useEffect(() => {
     const params = new URLSearchParams({ modelo: modelId, lugar: locationId })
@@ -108,20 +110,6 @@ export default function App() {
                 )
               })}
             </div>
-            <label className="location-picker">
-              <span className="sr-only">Ubicación</span>
-              <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-                {[...new Set(LOCATIONS.map((l) => l.island))].map((island) => (
-                  <optgroup key={island} label={island}>
-                    {LOCATIONS.filter((l) => l.island === island).map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
           </div>
           {activeLayers.length > 0 && (
             <LayerControls
@@ -146,10 +134,12 @@ export default function App() {
         </div>
         <LocationPanel
           location={location}
+          onLocationChange={setLocationId}
           modelId={modelId}
           current={current.data?.[locationId]}
           forecast={forecast.data}
           forecastError={forecast.error}
+          aiSummaries={aiSummaries}
         />
       </main>
 

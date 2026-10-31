@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Resúmenes con IA generados en local (en producción los crea la GitHub Action)
+public/data/
