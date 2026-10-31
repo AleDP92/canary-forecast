@@ -38,3 +38,13 @@ export const formatWeekday = (iso: string) => weekdayFmt.format(asUtc(iso))
 export function formatClock(date: Date): string {
   return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
 }
+
+const frameFmt = new Intl.DateTimeFormat('es-ES', {
+  weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: TZ,
+})
+
+/** "sáb, 18:00" a partir de segundos Unix, en hora de Canarias */
+export const formatFrameTime = (unix: number) => frameFmt.format(new Date(unix * 1000))
