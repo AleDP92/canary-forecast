@@ -1,0 +1,405 @@
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+/* Cabecera */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.brand h1 {
+  font-size: 1.6rem;
+}
+
+.brand p {
+  margin: 2px 0 0;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.refresh {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.refresh:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Selector de modelos */
+.model-selector {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chip:hover {
+  border-color: var(--model-color);
+}
+
+.chip--active {
+  background: var(--model-color);
+  border-color: var(--model-color);
+  color: #fff;
+  font-weight: 600;
+}
+
+.chip__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--model-color);
+}
+
+.chip--active .chip__dot {
+  background: #fff;
+}
+
+.model-info {
+  margin: 8px 2px 0;
+  font-size: 0.9rem;
+}
+
+/* Distribución */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mapa */
+.map-wrap {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.map {
+  height: min(72vh, 640px);
+  min-height: 380px;
+  width: 100%;
+  background: #aad3df;
+}
+
+.location-picker {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+}
+
+.location-picker select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  max-width: 60vw;
+}
+
+.temp-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 62px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--marker-bg);
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  border: 2px solid rgb(255 255 255 / 0.85);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.temp-marker strong {
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+.temp-marker:hover {
+  transform: scale(1.08);
+}
+
+.temp-marker--selected {
+  transform: scale(1.18);
+  border-color: #0f172a;
+  box-shadow: 0 0 0 3px #fff, 0 2px 8px rgb(0 0 0 / 0.4);
+}
+
+/* Panel de detalle */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.panel__header p {
+  margin: 2px 0 0;
+}
+
+.badge {
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.panel h3 {
+  font-size: 1rem;
+}
+
+.now__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.now__icon {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.now__temp {
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.now__details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.now__details div {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.now__details dt {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.now__details dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* Gráfica */
+.chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart__grid {
+  stroke: var(--grid);
+}
+
+.chart__day {
+  stroke: var(--muted);
+  stroke-dasharray: 3 3;
+  opacity: 0.5;
+}
+
+.chart__cursor {
+  stroke: var(--muted);
+}
+
+.chart__label {
+  fill: var(--muted);
+  font-size: 13px;
+}
+
+.chart__label--rain {
+  fill: var(--rain);
+}
+
+.chart__bar {
+  fill: var(--rain);
+  opacity: 0.55;
+}
+
+.chart__tooltip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-height: 2.6em;
+  font-size: 0.85rem;
+}
+
+.chart__tooltip strong {
+  width: 100%;
+}
+
+.chart__tooltip i {
+  display: inline-block;
+  width: 10px;
+  height: 3px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.tooltip__item--emphasis {
+  font-weight: 600;
+}
+
+.agreement {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+}
+
+.agreement--alto {
+  color: #16a34a;
+}
+
+.agreement--medio {
+  color: #ca8a04;
+}
+
+.agreement--bajo {
+  color: #dc2626;
+}
+
+/* Previsión diaria */
+.daily {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.daily li {
+  display: grid;
+  grid-template-columns: 5.5em 2em 5em 1fr 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.92rem;
+}
+
+.daily__day {
+  text-transform: capitalize;
+}
+
+.daily__icon {
+  font-size: 1.3rem;
+}
+
+.daily__rain,
+.daily__wind {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 520px) {
+  .daily li {
+    grid-template-columns: 4.5em 1.8em 4.5em 1fr;
+  }
+
+  .daily__wind {
+    display: none;
+  }
+}
+
+.footer {
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 8px 0 16px;
+}
