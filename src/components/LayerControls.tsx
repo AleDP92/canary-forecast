@@ -1,19 +1,25 @@
 import type { CSSProperties } from 'react'
+import { nearestGridIndex, nearestGridValue, sampleGrid, type ModelGrid } from '../api/modelGrid'
 import {
-  nearestGridIndex,
-  nearestGridValue,
-  sampleGrid,
-  type ModelGrid,
-} from '../api/modelGrid'
-import { arrowColor, legendGradient, legendPosition, type LayerId, type MapLayer } from '../data/mapLayers'
+  FILL_LAYERS,
+  LAYER_BUTTONS,
+  WIND_SCALES,
+  legendGradient,
+  legendPosition,
+  windColor,
+  type FillLayer,
+  type LayerId,
+  type WindMode,
+} from '../data/mapLayers'
 import { windDirection } from '../data/weatherCodes'
 import type { LayerFrame } from '../hooks/useMapLayer'
 import { formatFrameTime } from '../utils/time'
 import type { Probe } from './WeatherMap'
 
 interface Props {
-  layer: MapLayer
-  onLayer: (id: LayerId) => void
+  active: LayerId[]
+  windMode: WindMode
+  onWindMode: (m: WindMode) => void
   frames: LayerFrame[]
   index: number
   nowIndex: number
@@ -22,17 +28,28 @@ interface Props {
   onPlaying: (p: boolean) => void
   observedError: string | null
   gridError: string | null
-  fieldMissing: boolean
+  /** Capas activas que el modelo no ofrece */
+  missing: LayerId[]
   modelName: string
   grid: ModelGrid | null
   probe: Probe | null
   onClearProbe: () => void
-  showArrows: boolean
-  onShowArrows: (v: boolean) => void
 }
 
 /** Datos de lluvia, CAPE y viento en el punto señalado, en la hora del fotograma */
-function PointReadout({ grid, frame, probe, onClear }: { grid: ModelGrid | null; frame: LayerFrame; probe: Probe | null; onClear: () => void }) {
+function PointReadout({
+  grid,
+  frame,
+  probe,
+  windMode,
+  onClear,
+}: {
+  grid: ModelGrid | null
+  frame: LayerFrame
+  probe: Probe | null
+  windMode: WindMode
+  onClear: () => void
+}) {
   if (!probe) {
     return <div className="point-readout muted">Pasa el ratón o toca el mapa para ver lluvia, CAPE y viento en un punto.</div>
   }
@@ -46,6 +63,7 @@ function PointReadout({ grid, frame, probe, onClear }: { grid: ModelGrid | null;
   const wind = sample(f.wind_speed_10m)
   const gusts = sample(f.wind_gusts_10m)
   const dir = f.wind_direction_10m ? nearestGridValue(f.wind_direction_10m[gi], probe.lat, probe.lon) : null
+  const colorValue = windMode === 'gusts' ? gusts : wind
 
   if (wind == null && rain == null) {
     return <div className="point-readout muted">Ese punto queda fuera de la zona de previsión.</div>
@@ -59,7 +77,10 @@ function PointReadout({ grid, frame, probe, onClear }: { grid: ModelGrid | null;
       <span>🌧️ {rain == null ? '–' : `${rain.toFixed(1)} mm/h`}</span>
       <span>⚡ {cape == null ? 'n/d' : `${Math.round(cape)} J/kg`}</span>
       <span>
-        <i className="point-readout__dot" style={{ background: wind == null ? undefined : arrowColor(wind) }} />
+        <i
+          className="point-readout__dot"
+          style={{ background: colorValue == null ? undefined : windColor(windMode, colorValue) }}
+        />
         💨 {wind == null ? '–' : `${Math.round(wind)} km/h ${windDirection(dir)}`}
         {gusts != null && <span className="muted"> · rachas {Math.round(gusts)}</span>}
       </span>
@@ -72,6 +93,43 @@ function PointReadout({ grid, frame, probe, onClear }: { grid: ModelGrid | null;
   )
 }
 
+function FillLegend({ layer }: { layer: FillLayer }) {
+  return (
+    <span className="layer-legend" aria-label={`Escala de ${layer.name} en ${layer.unit}`}>
+      <span className="layer-legend__name">{layer.icon}</span>
+      <span className="layer-legend__bar">
+        <i style={{ background: legendGradient(layer) }} />
+        {layer.legend.map((v) => {
+          const pos = legendPosition(layer, v)
+          // Los extremos se alinean hacia dentro para no salirse de la barra
+          const shift = pos <= 5 ? '0' : pos >= 95 ? '-100%' : '-50%'
+          return (
+            <span key={v} style={{ left: `${pos}%`, transform: `translateX(${shift})` }}>
+              {v}
+            </span>
+          )
+        })}
+      </span>
+      <span className="muted layer-legend__unit">{layer.unit}</span>
+    </span>
+  )
+}
+
+function WindLegend({ mode }: { mode: WindMode }) {
+  const [low, mid, high] = WIND_SCALES[mode].legend
+  return (
+    <span className="arrow-legend" aria-label={`Color de las flechas según ${WIND_SCALES[mode].name.toLowerCase()}`}>
+      💨
+      <i style={{ background: windColor(mode, low - 5) }} />
+      &lt;{low}
+      <i style={{ background: windColor(mode, mid) }} />
+      {mid}
+      <i style={{ background: windColor(mode, high) }} />
+      &gt;{high} km/h
+    </span>
+  )
+}
+
 function relative(frame: LayerFrame, now: LayerFrame): string {
   const minutes = Math.round((frame.time - now.time) / 60)
   if (minutes === 0) return frame.kind === 'observed' ? 'último dato' : 'ahora'
@@ -79,31 +137,35 @@ function relative(frame: LayerFrame, now: LayerFrame): string {
   return minutes < 60 ? `+${minutes} min` : `+${Math.round(minutes / 60)} h`
 }
 
-export function LayerControls(props: Props) {
-  const { layer, frames, index, nowIndex, onIndex, playing, onPlaying, modelName } = props
-  const { observedError, gridError, fieldMissing } = props
+const layerName = (id: LayerId) => LAYER_BUTTONS.find((b) => b.id === id)!.name
 
-  if (fieldMissing && !layer.observed) {
-    return (
-      <div className="radar-controls muted">
-        {modelName} no ofrece {layer.name} en Open-Meteo. Prueba con otro modelo.
-      </div>
-    )
-  }
+export function LayerControls(props: Props) {
+  const { active, windMode, frames, index, nowIndex, onIndex, playing, onPlaying, modelName } = props
+  const { observedError, gridError, missing } = props
+  const withRadar = active.includes('rain')
+  const missingNote = missing.length > 0 && (
+    <div className="radar-controls__warn">
+      {modelName} no ofrece {missing.map(layerName).join(' ni ')} en Open-Meteo. Prueba con otro modelo.
+    </div>
+  )
+
   if (!frames.length) {
     const error = gridError ?? observedError
     return (
-      <div className={`radar-controls${error ? ' error' : ' muted'}`}>
-        {error ? `${layer.name} no disponible: ${error}` : `Cargando ${layer.name.toLowerCase()}…`}
+      <div className={`radar-controls${error ? ' error' : ''}`}>
+        {missingNote || (
+          <span className={error ? undefined : 'muted'}>{error ? `Capas no disponibles: ${error}` : 'Cargando capas…'}</span>
+        )}
       </div>
     )
   }
 
   const frame = frames[index]
-  const pastCount = layer.observed ? nowIndex + 1 : 0
+  const pastCount = withRadar ? nowIndex + 1 : 0
   // Proporción de la barra que corresponde al radar observado
-  const nowPct = layer.observed && frames.length > 1 ? (nowIndex / (frames.length - 1)) * 100 : 0
+  const nowPct = withRadar && frames.length > 1 ? (nowIndex / (frames.length - 1)) * 100 : 0
   const isForecast = frame.kind === 'forecast'
+  const fills = FILL_LAYERS.filter((l) => active.includes(l.id) && !missing.includes(l.id))
 
   return (
     <div className="radar-controls">
@@ -126,7 +188,7 @@ export function LayerControls(props: Props) {
               onPlaying(false)
               onIndex(Number(e.target.value))
             }}
-            aria-label={`Momento de la capa ${layer.name}`}
+            aria-label="Momento de las capas"
             aria-valuetext={`${formatFrameTime(frame.time)}, ${isForecast ? 'previsión' : 'radar'}`}
           />
           <div className="radar-timeline__track" aria-hidden="true">
@@ -150,62 +212,41 @@ export function LayerControls(props: Props) {
       </div>
 
       <div className="radar-controls__row radar-controls__info">
-        {layer.arrows && (
-          <div className="segmented" role="group" aria-label="Tipo de viento">
-            <button type="button" aria-pressed={layer.id === 'wind'} onClick={() => props.onLayer('wind')}>
-              Medio
-            </button>
-            <button type="button" aria-pressed={layer.id === 'gusts'} onClick={() => props.onLayer('gusts')}>
-              Rachas
-            </button>
-          </div>
-        )}
         <span className={`radar-badge${isForecast ? ' radar-badge--forecast' : ''}`}>
-          {layer.icon} {isForecast ? `${layer.name} · ${modelName}` : 'Radar observado'}
+          {isForecast ? `Previsión · ${modelName}` : 'Radar observado'}
         </span>
         <span className="radar-controls__time">
           <strong>{formatFrameTime(frame.time)}</strong>{' '}
           <span className="muted">· {relative(frame, frames[nowIndex])}</span>
         </span>
-        {!layer.arrows && (
-          <label className="toggle arrows-toggle">
-            <input type="checkbox" checked={props.showArrows} onChange={(e) => props.onShowArrows(e.target.checked)} />
-            Flechas de viento
-          </label>
+        {active.includes('wind') && (
+          <div className="segmented" role="group" aria-label="Color de las flechas">
+            <button type="button" aria-pressed={windMode === 'mean'} onClick={() => props.onWindMode('mean')}>
+              Medio
+            </button>
+            <button type="button" aria-pressed={windMode === 'gusts'} onClick={() => props.onWindMode('gusts')}>
+              Rachas
+            </button>
+          </div>
         )}
-        {(layer.arrows || props.showArrows) && (
-          <span className="arrow-legend" aria-label="Color de las flechas según el viento medio">
-            <i style={{ background: arrowColor(10) }} />
-            &lt;15
-            <i style={{ background: arrowColor(30) }} />
-            30
-            <i style={{ background: arrowColor(50) }} />
-            &gt;50 km/h
-          </span>
-        )}
-        <span className="layer-legend" aria-label={`Escala de ${layer.name} en ${layer.unit}`}>
-          <span className="layer-legend__bar">
-            <i style={{ background: legendGradient(layer) }} />
-            {layer.legend.map((v) => {
-              const pos = legendPosition(layer, v)
-              // Los extremos se alinean hacia dentro para no salirse de la barra
-              const shift = pos <= 5 ? '0' : pos >= 95 ? '-100%' : '-50%'
-              return (
-                <span key={v} style={{ left: `${pos}%`, transform: `translateX(${shift})` }}>
-                  {v}
-                </span>
-              )
-            })}
-          </span>
-          <span className="muted layer-legend__unit">{layer.unit}</span>
-        </span>
       </div>
-      <PointReadout grid={props.grid} frame={frame} probe={props.probe} onClear={props.onClearProbe} />
+
+      <div className="radar-controls__row radar-controls__legends">
+        {fills.map((l) => (
+          <FillLegend key={l.id} layer={l} />
+        ))}
+        {active.includes('wind') && <WindLegend mode={windMode} />}
+      </div>
+
+      <PointReadout grid={props.grid} frame={frame} probe={props.probe} windMode={windMode} onClear={props.onClearProbe} />
       {gridError && <div className="radar-controls__warn">No se pudo cargar la previsión: {gridError}</div>}
-      {fieldMissing && layer.observed && (
-        <div className="radar-controls__warn">{modelName} no ofrece previsión de {layer.name.toLowerCase()}.</div>
-      )}
-      {isForecast && <div className="radar-controls__note muted">{layer.note}</div>}
+      {missingNote}
+      {isForecast &&
+        fills.map((l) => (
+          <div key={l.id} className="radar-controls__note muted">
+            {l.note}
+          </div>
+        ))}
     </div>
   )
 }

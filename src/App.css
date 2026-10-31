@@ -408,6 +408,19 @@
   color: var(--error-text);
 }
 
+.radar-controls__legends {
+  gap: 6px 18px;
+}
+
+.radar-controls__legends:empty {
+  display: none;
+}
+
+.layer-legend__name {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
 .layer-legend {
   display: inline-flex;
   align-items: flex-start;
