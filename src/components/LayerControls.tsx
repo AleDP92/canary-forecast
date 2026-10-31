@@ -1,7 +1,15 @@
 import type { CSSProperties } from 'react'
-import { legendGradient, legendPosition, type LayerId, type MapLayer } from '../data/mapLayers'
+import {
+  nearestGridIndex,
+  nearestGridValue,
+  sampleGrid,
+  type ModelGrid,
+} from '../api/modelGrid'
+import { arrowColor, legendGradient, legendPosition, type LayerId, type MapLayer } from '../data/mapLayers'
+import { windDirection } from '../data/weatherCodes'
 import type { LayerFrame } from '../hooks/useMapLayer'
 import { formatFrameTime } from '../utils/time'
+import type { Probe } from './WeatherMap'
 
 interface Props {
   layer: MapLayer
@@ -16,6 +24,52 @@ interface Props {
   gridError: string | null
   fieldMissing: boolean
   modelName: string
+  grid: ModelGrid | null
+  probe: Probe | null
+  onClearProbe: () => void
+  showArrows: boolean
+  onShowArrows: (v: boolean) => void
+}
+
+/** Datos de lluvia, CAPE y viento en el punto señalado, en la hora del fotograma */
+function PointReadout({ grid, frame, probe, onClear }: { grid: ModelGrid | null; frame: LayerFrame; probe: Probe | null; onClear: () => void }) {
+  if (!probe) {
+    return <div className="point-readout muted">Pasa el ratón o toca el mapa para ver lluvia, CAPE y viento en un punto.</div>
+  }
+  if (!grid) return null
+  // Sobre el radar observado se usa la hora prevista más cercana
+  const gi = frame.kind === 'forecast' ? frame.gridIndex : nearestGridIndex(grid, frame.time)
+  const f = grid.fields
+  const sample = (v: Float32Array[] | null) => (v ? sampleGrid(v[gi], probe.lat, probe.lon) : null)
+  const rain = sample(f.precipitation)
+  const cape = sample(f.cape)
+  const wind = sample(f.wind_speed_10m)
+  const gusts = sample(f.wind_gusts_10m)
+  const dir = f.wind_direction_10m ? nearestGridValue(f.wind_direction_10m[gi], probe.lat, probe.lon) : null
+
+  if (wind == null && rain == null) {
+    return <div className="point-readout muted">Ese punto queda fuera de la zona de previsión.</div>
+  }
+  return (
+    <div className="point-readout">
+      <span className="point-readout__where">
+        📍 {probe.lat.toFixed(2)}° N, {Math.abs(probe.lon).toFixed(2)}° O
+        {frame.kind === 'observed' && <span className="muted"> (modelo, {formatFrameTime(grid.times[gi])})</span>}
+      </span>
+      <span>🌧️ {rain == null ? '–' : `${rain.toFixed(1)} mm/h`}</span>
+      <span>⚡ {cape == null ? 'n/d' : `${Math.round(cape)} J/kg`}</span>
+      <span>
+        <i className="point-readout__dot" style={{ background: wind == null ? undefined : arrowColor(wind) }} />
+        💨 {wind == null ? '–' : `${Math.round(wind)} km/h ${windDirection(dir)}`}
+        {gusts != null && <span className="muted"> · rachas {Math.round(gusts)}</span>}
+      </span>
+      {probe.pinned && (
+        <button type="button" className="point-readout__close" onClick={onClear} aria-label="Quitar punto">
+          ✕
+        </button>
+      )}
+    </div>
+  )
 }
 
 function relative(frame: LayerFrame, now: LayerFrame): string {
@@ -113,6 +167,22 @@ export function LayerControls(props: Props) {
           <strong>{formatFrameTime(frame.time)}</strong>{' '}
           <span className="muted">· {relative(frame, frames[nowIndex])}</span>
         </span>
+        {!layer.arrows && (
+          <label className="toggle arrows-toggle">
+            <input type="checkbox" checked={props.showArrows} onChange={(e) => props.onShowArrows(e.target.checked)} />
+            Flechas de viento
+          </label>
+        )}
+        {(layer.arrows || props.showArrows) && (
+          <span className="arrow-legend" aria-label="Color de las flechas según el viento medio">
+            <i style={{ background: arrowColor(10) }} />
+            &lt;15
+            <i style={{ background: arrowColor(30) }} />
+            30
+            <i style={{ background: arrowColor(50) }} />
+            &gt;50 km/h
+          </span>
+        )}
         <span className="layer-legend" aria-label={`Escala de ${layer.name} en ${layer.unit}`}>
           <span className="layer-legend__bar">
             <i style={{ background: legendGradient(layer) }} />
@@ -130,6 +200,7 @@ export function LayerControls(props: Props) {
           <span className="muted layer-legend__unit">{layer.unit}</span>
         </span>
       </div>
+      <PointReadout grid={props.grid} frame={frame} probe={props.probe} onClear={props.onClearProbe} />
       {gridError && <div className="radar-controls__warn">No se pudo cargar la previsión: {gridError}</div>}
       {fieldMissing && layer.observed && (
         <div className="radar-controls__warn">{modelName} no ofrece previsión de {layer.name.toLowerCase()}.</div>

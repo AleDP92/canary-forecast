@@ -11,7 +11,10 @@ Web que muestra la previsión del tiempo en tiempo real sobre las Islas Canarias
 - **Capas animadas en el mapa** con línea de tiempo de 48 h:
   - 🌧️ **Lluvia**: las últimas 2 horas de radar real (RainViewer, con datos de los radares de AEMET) y, a continuación, la precipitación prevista por el modelo.
   - ⚡ **CAPE**: energía disponible para la convección.
-  - 💨 **Viento**: viento medio o rachas, con flechas de dirección.
+  - 💨 **Viento**: viento medio o rachas.
+  - **Flechas de viento** sobre cualquier capa, de color según la fuerza (verde flojo, amarillo moderado, rojo fuerte).
+  - **Datos de un punto**: al pasar el ratón o tocar el mapa se muestran la lluvia, el CAPE, el viento y las rachas de ese lugar en la hora elegida.
+  - Con una capa activa el mapa base pasa a gris para que los colores contrasten.
   - Al cambiar de capa o de modelo se mantiene la hora elegida.
 - **Pestaña Convección** con CAPE, CIN, Índice K, Total Totals, Lifted Index, temperatura a 500 hPa (detección de DANA) e isocero. Muestra el valor más desfavorable, su nivel de riesgo y una gráfica con umbrales, comparable entre modelos.
 - Se actualiza sola (el mapa cada 10 min, la previsión cada 30 min).

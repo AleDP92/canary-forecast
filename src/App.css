@@ -201,15 +201,82 @@
   opacity: 0.75;
 }
 
+/* Con una capa activa, el mapa base en gris para que los colores contrasten */
+.map-wrap--layer .basemap {
+  filter: grayscale(1) brightness(1.05) contrast(0.85);
+}
+
 /* Flechas de viento: grosor fijo en pantalla aunque se escale el SVG */
 .wind-arrows path {
   fill: none;
-  stroke: #0f172a;
-  stroke-opacity: 0.65;
-  stroke-width: 1.4px;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+}
+
+.wind-arrow__halo {
+  stroke: rgb(15 23 42 / 0.75);
+  stroke-width: 3.6px;
+}
+
+.wind-arrow {
+  stroke-width: 1.8px;
+}
+
+.arrow-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.arrow-legend i {
+  width: 12px;
+  height: 4px;
+  border-radius: 2px;
+  margin-left: 4px;
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.5);
+}
+
+.arrows-toggle {
+  font-size: 0.82rem;
+}
+
+.point-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 14px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 0.84rem;
+}
+
+.point-readout.muted {
+  font-size: 0.78rem;
+}
+
+.point-readout__where {
+  font-weight: 600;
+}
+
+.point-readout__dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 4px;
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.5);
+}
+
+.point-readout__close {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
 }
 
 @media (max-width: 520px) {
@@ -768,4 +835,16 @@
   font-size: 0.8rem;
   text-align: center;
   padding: 8px 0 16px;
+}
+
+/* En móvil los controles de la capa van debajo del mapa para no taparlo
+   (al final del archivo para que prevalezca sobre .radar-controls) */
+@media (max-width: 520px) {
+  .radar-controls {
+    position: static;
+    border-radius: 0;
+    border: none;
+    border-top: 1px solid var(--border);
+    box-shadow: none;
+  }
 }

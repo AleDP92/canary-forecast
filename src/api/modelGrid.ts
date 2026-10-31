@@ -88,3 +88,38 @@ export async function fetchModelGrid(modelId: string, signal?: AbortSignal): Pro
   cache.set(modelId, { at: Date.now(), grid })
   return grid
 }
+
+/** Índice del instante de la rejilla más cercano a `time` (segundos Unix) */
+export function nearestGridIndex(grid: ModelGrid, time: number): number {
+  let best = 0
+  grid.times.forEach((t, i) => {
+    if (Math.abs(t - time) < Math.abs(grid.times[best] - time)) best = i
+  })
+  return best
+}
+
+/** Valor interpolado (bilineal) en un punto; null si cae fuera de la rejilla */
+export function sampleGrid(values: Float32Array, lat: number, lon: number): number | null {
+  const gx = (lon - GRID.lonMin) / GRID.step
+  const gy = (lat - GRID.latMin) / GRID.step
+  if (gx < 0 || gy < 0 || gx > GRID_COLS - 1 || gy > GRID_ROWS - 1) return null
+  const c0 = Math.min(Math.floor(gx), GRID_COLS - 2)
+  const r0 = Math.min(Math.floor(gy), GRID_ROWS - 2)
+  const fx = gx - c0
+  const fy = gy - r0
+  const at = (r: number, c: number) => values[r * GRID_COLS + c]
+  return (
+    at(r0, c0) * (1 - fx) * (1 - fy) +
+    at(r0, c0 + 1) * fx * (1 - fy) +
+    at(r0 + 1, c0) * (1 - fx) * fy +
+    at(r0 + 1, c0 + 1) * fx * fy
+  )
+}
+
+/** Valor del punto de la rejilla más cercano (para la dirección del viento, que no se interpola) */
+export function nearestGridValue(values: Float32Array, lat: number, lon: number): number | null {
+  const c = Math.round((lon - GRID.lonMin) / GRID.step)
+  const r = Math.round((lat - GRID.latMin) / GRID.step)
+  if (c < 0 || r < 0 || c > GRID_COLS - 1 || r > GRID_ROWS - 1) return null
+  return values[r * GRID_COLS + c]
+}

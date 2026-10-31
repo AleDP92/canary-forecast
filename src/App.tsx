@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { LocationPanel } from './components/LocationPanel'
 import { ModelSelector } from './components/ModelSelector'
 import { LayerControls } from './components/LayerControls'
-import { WeatherMap } from './components/WeatherMap'
+import { WeatherMap, type Probe } from './components/WeatherMap'
 import { DEFAULT_LOCATION_ID, LOCATIONS } from './data/locations'
 import { DEFAULT_MODEL_ID, MODELS, getModel } from './data/models'
 import { MAP_LAYERS, getLayer, layerFromSlug, type LayerId } from './data/mapLayers'
@@ -32,12 +32,15 @@ export default function App() {
     return layerFromSlug(params.get('capa')) ?? (params.has('radar') ? 'rain' : null)
   })
   const mapLayer = useMapLayer(layerId, modelId)
+  const [showArrows, setShowArrows] = useState(true)
+  const [probe, setProbe] = useState<Probe | null>(null)
 
   /** Pulsar la capa activa la desactiva; al activar una se reproduce la animación */
   const toggleLayer = (id: LayerId) => {
     const isActive = layerId === id || (id === 'wind' && layerId === 'gusts')
     setLayerId(isActive ? null : id)
     mapLayer.setPlaying(!isActive)
+    if (isActive) setProbe(null)
   }
 
   const current = useCurrentForAll(LOCATIONS, modelId)
@@ -88,6 +91,9 @@ export default function App() {
             frames={mapLayer.frames}
             frameIndex={mapLayer.index}
             grid={mapLayer.grid}
+            showArrows={showArrows}
+            probe={probe}
+            onProbe={setProbe}
           />
           <div className="map-toolbar">
             <div className="layer-picker" role="group" aria-label="Capa del mapa">
@@ -135,6 +141,11 @@ export default function App() {
               gridError={mapLayer.gridError}
               fieldMissing={mapLayer.fieldMissing}
               modelName={getModel(modelId).name}
+              grid={mapLayer.grid}
+              probe={probe}
+              onClearProbe={() => setProbe(null)}
+              showArrows={showArrows}
+              onShowArrows={setShowArrows}
             />
           )}
         </div>
