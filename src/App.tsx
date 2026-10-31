@@ -4,7 +4,7 @@ import { ModelSelector } from './components/ModelSelector'
 import { RadarControls } from './components/RadarControls'
 import { WeatherMap } from './components/WeatherMap'
 import { DEFAULT_LOCATION_ID, LOCATIONS } from './data/locations'
-import { DEFAULT_MODEL_ID, MODELS } from './data/models'
+import { DEFAULT_MODEL_ID, MODELS, getModel } from './data/models'
 import { useRadar } from './hooks/useRadar'
 import { useCurrentForAll, useForecast } from './hooks/useWeather'
 import { formatClock } from './utils/time'
@@ -26,7 +26,7 @@ export default function App() {
   const location = LOCATIONS.find((l) => l.id === locationId) ?? LOCATIONS[0]
 
   const [radarOn, setRadarOn] = useState(() => new URLSearchParams(window.location.search).has('radar'))
-  const radar = useRadar(radarOn)
+  const radar = useRadar(radarOn, modelId)
 
   const current = useCurrentForAll(LOCATIONS, modelId)
   const forecast = useForecast(location, ALL_MODEL_IDS)
@@ -73,6 +73,7 @@ export default function App() {
             onSelect={setLocationId}
             radarFrames={radarOn ? radar.frames : []}
             radarIndex={radar.index}
+            precipGrid={radar.grid}
           />
           <div className="map-toolbar">
             <button
@@ -105,10 +106,13 @@ export default function App() {
             <RadarControls
               frames={radar.frames}
               index={radar.index}
+              nowIndex={radar.nowIndex}
               onIndex={radar.setIndex}
               playing={radar.playing}
               onPlaying={radar.setPlaying}
               error={radar.error}
+              forecastError={radar.forecastError}
+              modelName={getModel(modelId).name}
             />
           )}
         </div>

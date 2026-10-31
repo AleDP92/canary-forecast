@@ -51,6 +51,7 @@ export interface ModelSeries {
 async function getJson(params: Record<string, string>, signal?: AbortSignal) {
   const url = `${BASE_URL}?${new URLSearchParams(params)}`
   const res = await fetch(url, { signal })
+  if (res.status === 429) throw new Error('Límite de peticiones de Open-Meteo alcanzado; prueba de nuevo en un minuto')
   const data = await res.json()
   if (!res.ok || data?.error) {
     throw new Error(data?.reason ?? `Error ${res.status} al consultar Open-Meteo`)

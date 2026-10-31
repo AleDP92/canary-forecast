@@ -197,9 +197,8 @@
   bottom: 24px;
   z-index: 1000;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
+  flex-direction: column;
+  gap: 6px;
   padding: 8px 12px;
   border-radius: 10px;
   background: var(--surface);
@@ -212,12 +211,15 @@
   background: var(--error-bg);
 }
 
-.radar-controls input[type='range'] {
-  flex: 1 1 140px;
-  accent-color: #0369a1;
+.radar-controls__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
 }
 
 .radar-controls__play {
+  flex: none;
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -228,8 +230,87 @@
   font-size: 0.8rem;
 }
 
+.radar-controls__now {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.radar-controls__now:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.radar-timeline {
+  flex: 1 1 160px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.radar-timeline input[type='range'] {
+  width: 100%;
+  margin: 0;
+  accent-color: #0369a1;
+}
+
+/* Franja bajo el deslizador: parte observada (gris) y parte prevista (morado) */
+.radar-timeline__track {
+  display: flex;
+  font-size: 0.7rem;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.radar-timeline__past,
+.radar-timeline__future {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+  border-top: 3px solid;
+}
+
+.radar-timeline__past {
+  flex: 0 0 var(--now-pct);
+  border-color: #64748b;
+  color: var(--muted);
+}
+
+.radar-timeline__future {
+  flex: 1;
+  border-color: #7c3aed;
+  color: #7c3aed;
+}
+
+.radar-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #64748b;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.radar-badge--forecast {
+  background: #7c3aed;
+}
+
 .radar-controls__time {
   min-width: 9em;
+}
+
+.radar-controls__note,
+.radar-controls__warn {
+  font-size: 0.75rem;
+}
+
+.radar-controls__warn {
+  color: var(--error-text);
 }
 
 .radar-legend {

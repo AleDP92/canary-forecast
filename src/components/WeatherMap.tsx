@@ -1,11 +1,13 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useMemo, useState } from 'react'
-import { MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
+import { ImageOverlay, MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-leaflet'
 import type { CurrentConditions } from '../api/openMeteo'
+import type { PrecipGrid } from '../api/precipGrid'
 import { LOCATIONS, MAP_BOUNDS, type Location } from '../data/locations'
 import { describeWeather } from '../data/weatherCodes'
 import { RADAR_MAX_NATIVE_ZOOM, type RadarFrame } from '../hooks/useRadar'
+import { PRECIP_BOUNDS, renderPrecipFrame } from '../utils/precipImage'
 
 interface Props {
   current: Record<string, CurrentConditions> | null
@@ -17,26 +19,33 @@ interface MapProps extends Props {
   /** Fotogramas del radar; vacío si el radar está desactivado */
   radarFrames: RadarFrame[]
   radarIndex: number
+  precipGrid: PrecipGrid | null
 }
 
 /**
- * Se montan todos los fotogramas a la vez y solo el actual es visible:
- * así las imágenes ya están cargadas cuando se anima.
+ * Los fotogramas observados se montan todos a la vez y solo el actual es
+ * visible, así las imágenes ya están cargadas cuando se anima. Los de
+ * previsión se dibujan al vuelo a partir de la rejilla del modelo.
  */
-function RadarLayers({ frames, index }: { frames: RadarFrame[]; index: number }) {
+function RadarLayers({ frames, index, grid }: { frames: RadarFrame[]; index: number; grid: PrecipGrid | null }) {
+  const current = frames[index]
+  const forecastUrl = current?.kind === 'forecast' && grid ? renderPrecipFrame(grid, current.gridIndex) : null
   return (
     <>
-      {frames.map((f, i) => (
-        <TileLayer
-          key={f.url}
-          url={f.url}
-          opacity={i === index ? 0.8 : 0}
-          zIndex={10}
-          maxNativeZoom={RADAR_MAX_NATIVE_ZOOM}
-          maxZoom={18}
-          attribution='Radar: <a href="https://www.rainviewer.com/">RainViewer</a> · AEMET'
-        />
-      ))}
+      {frames.map((f, i) =>
+        f.kind === 'observed' ? (
+          <TileLayer
+            key={f.url}
+            url={f.url}
+            opacity={i === index ? 0.8 : 0}
+            zIndex={10}
+            maxNativeZoom={RADAR_MAX_NATIVE_ZOOM}
+            maxZoom={18}
+            attribution='Radar: <a href="https://www.rainviewer.com/">RainViewer</a> · AEMET'
+          />
+        ) : null,
+      )}
+      {forecastUrl && <ImageOverlay url={forecastUrl} bounds={PRECIP_BOUNDS} opacity={0.85} zIndex={11} />}
     </>
   )
 }
@@ -97,14 +106,14 @@ function Markers({ current, selectedId, onSelect }: Props) {
   )
 }
 
-export function WeatherMap({ radarFrames, radarIndex, ...props }: MapProps) {
+export function WeatherMap({ radarFrames, radarIndex, precipGrid, ...props }: MapProps) {
   return (
     <MapContainer bounds={MAP_BOUNDS} boundsOptions={{ padding: [24, 24] }} minZoom={6} className="map" scrollWheelZoom>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <RadarLayers frames={radarFrames} index={radarIndex} />
+      <RadarLayers frames={radarFrames} index={radarIndex} grid={precipGrid} />
       <Markers {...props} />
     </MapContainer>
   )
