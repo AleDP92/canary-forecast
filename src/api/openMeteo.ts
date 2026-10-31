@@ -1,3 +1,4 @@
+import { INDEX_SOURCE_VARS, type IndexSourceVar } from '../data/indices'
 import type { Location } from '../data/locations'
 
 const BASE_URL = 'https://api.open-meteo.com/v1/forecast'
@@ -117,5 +118,57 @@ export async function fetchForecastByModel(
         daily: pick(data.daily, DAILY_VARS, m),
       } as unknown as ModelSeries,
     ]),
+  )
+}
+
+/**
+ * Algunos modelos no publican ciertas variables en Open-Meteo (p. ej. ECMWF IFS
+ * a 9 km no tiene niveles de presión). Para esos casos se usa otra versión del
+ * mismo modelo.
+ */
+const INDEX_FALLBACK_MODEL: Record<string, string> = {
+  ecmwf_ifs: 'ecmwf_ifs025',
+}
+
+export interface IndexSeries {
+  time: string[]
+  /** Valores por variable; `null` en toda la serie si el modelo no la ofrece */
+  values: Record<IndexSourceVar, (number | null)[]>
+}
+
+/** Variables de inestabilidad (CAPE, niveles de presión…) de una ubicación para varios modelos */
+export async function fetchIndexSources(
+  location: Location,
+  modelIds: string[],
+  signal?: AbortSignal,
+): Promise<Record<string, IndexSeries>> {
+  const requested = [...new Set([...modelIds, ...modelIds.map((m) => INDEX_FALLBACK_MODEL[m]).filter(Boolean)])]
+  const data = await getJson(
+    {
+      latitude: String(location.lat),
+      longitude: String(location.lon),
+      hourly: INDEX_SOURCE_VARS.join(','),
+      models: requested.join(','),
+      forecast_days: '7',
+      timezone: TIMEZONE,
+    },
+    signal,
+  )
+  const hourly = data.hourly as Record<string, (number | null)[]>
+  const series = (model: string, v: string) =>
+    (requested.length === 1 ? hourly[v] : hourly[`${v}_${model}`]) ?? []
+  const hasData = (arr: (number | null)[]) => arr.some((x) => x != null)
+
+  return Object.fromEntries(
+    modelIds.map((m) => {
+      const values = {} as IndexSeries['values']
+      for (const v of INDEX_SOURCE_VARS) {
+        let arr = series(m, v)
+        const fallback = INDEX_FALLBACK_MODEL[m]
+        if (!hasData(arr) && fallback) arr = series(fallback, v)
+        values[v] = arr
+      }
+      return [m, { time: hourly.time as unknown as string[], values }]
+    }),
   )
 }

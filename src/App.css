@@ -143,11 +143,108 @@
   background: #aad3df;
 }
 
-.location-picker {
+.map-toolbar {
   position: absolute;
   top: 10px;
   right: 10px;
+  /* Deja libre el control de zoom de Leaflet a la izquierda */
+  left: 56px;
   z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.map-toolbar > * {
+  pointer-events: auto;
+}
+
+.location-picker {
+  min-width: 0;
+}
+
+.location-picker select {
+  width: 100%;
+}
+
+.radar-toggle {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.radar-toggle--active {
+  background: #0369a1;
+  border-color: #0369a1;
+  color: #fff;
+  font-weight: 600;
+}
+
+.map-wrap--radar .temp-marker {
+  opacity: 0.75;
+}
+
+.radar-controls {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+  font-size: 0.9rem;
+}
+
+.radar-controls.error {
+  background: var(--error-bg);
+}
+
+.radar-controls input[type='range'] {
+  flex: 1 1 140px;
+  accent-color: #0369a1;
+}
+
+.radar-controls__play {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: #0369a1;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.radar-controls__time {
+  min-width: 9em;
+}
+
+.radar-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.radar-legend i {
+  width: 90px;
+  height: 8px;
+  border-radius: 4px;
+  /* Colores muestreados del esquema «Universal Blue» de RainViewer */
+  background: linear-gradient(90deg, #e6dcb4, #80d0e0, #10a0e0, #0070a0, #004070);
 }
 
 .location-picker select {
@@ -156,7 +253,7 @@
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  max-width: 60vw;
+  max-width: 260px;
 }
 
 .temp-marker {
@@ -396,6 +493,148 @@
   .daily__wind {
     display: none;
   }
+}
+
+/* Pestañas del panel */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tabs button[aria-selected='true'] {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* Convección */
+.convection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.convection__intro {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.index-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.index-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.index-card--active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.index-card__name {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.index-card__value {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.index-card__value small {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.index-card__level {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.index-card__time,
+.index-card__na {
+  font-size: 0.75rem;
+}
+
+.convection__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.segmented button {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.index-help {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.index-levels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 0.82rem;
+}
+
+.index-levels i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+
+.index-note {
+  margin: 0;
+  font-size: 0.8rem;
 }
 
 .footer {
