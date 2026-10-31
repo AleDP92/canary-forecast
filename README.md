@@ -8,12 +8,27 @@ Web que muestra la previsión del tiempo en tiempo real sobre las Islas Canarias
 - **Selector de modelos**: ECMWF IFS, ECMWF AIFS, ICON, ARPEGE, UKMO, GFS, GEM y JMA.
 - **Panel de detalle** con las condiciones actuales, una gráfica de 48 horas (temperatura y precipitación) y la previsión de 7 días.
 - **Modo comparar**: superpone en la misma gráfica la temperatura de todos los modelos e indica cuánto coinciden entre sí.
+- **Radar de lluvia** animado de las últimas 2 horas (RainViewer, con datos de los radares de AEMET).
+- **Pestaña Convección** con CAPE, CIN, Índice K, Total Totals, Lifted Index, temperatura a 500 hPa (detección de DANA) e isocero. Muestra el valor más desfavorable, su nivel de riesgo y una gráfica con umbrales, comparable entre modelos.
 - Se actualiza sola (el mapa cada 10 min, la previsión cada 30 min).
 - El enlace guarda el modelo y la localidad elegidos (`?modelo=gfs_seamless&lugar=las-palmas`), así que se puede compartir.
 
-## Fuente de datos
+## Fuentes de datos
 
-[Open-Meteo](https://open-meteo.com/): gratuita, sin clave de API, licencia CC BY 4.0.
+- [Open-Meteo](https://open-meteo.com/) para los modelos: gratuita, sin clave de API, licencia CC BY 4.0.
+- [RainViewer](https://www.rainviewer.com/api.html) para el radar: gratuita. Solo ofrece las últimas ~2 h, sin predicción, con zoom nativo máximo 7 (a más zoom la imagen se amplía).
+
+### Índices por modelo
+
+El Índice K y el Total Totals se calculan con temperaturas y puntos de rocío a 850, 700 y 500 hPa. ECMWF IFS (9 km) no publica niveles de presión en Open-Meteo, así que para esos índices se usa ECMWF IFS a 25 km. El CIN se muestra en valor absoluto porque cada modelo usa un signo distinto.
+
+| Índice | Modelos |
+|---|---|
+| CAPE | IFS, ICON, ARPEGE, UKMO, GFS, GEM |
+| CIN | IFS, ICON, UKMO, GFS |
+| Lifted Index | GFS |
+| Isocero | ICON, GFS |
+| K, TT, T500 | todos |
 
 HARMONIE-AROME (AEMET) y AROME (Météo-France), los modelos de mayor resolución para la zona, **no están disponibles para Canarias en Open-Meteo**. Para añadirlos habría que usar AEMET OpenData, que requiere una clave de API.
 
@@ -40,6 +55,8 @@ src/
   data/models.ts          lista de modelos (añadir o quitar aquí)
   data/locations.ts       localidades del mapa
   data/weatherCodes.ts    códigos WMO → texto e icono
+  data/indices.ts         índices de convección: fórmulas y umbrales
   hooks/useWeather.ts     carga y refresco automático de datos
+  hooks/useRadar.ts       fotogramas y animación del radar
   components/             mapa, selector, panel y gráfica
 ```

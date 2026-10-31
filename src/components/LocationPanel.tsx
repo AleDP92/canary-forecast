@@ -3,7 +3,9 @@ import type { CurrentConditions, ModelSeries } from '../api/openMeteo'
 import type { Location } from '../data/locations'
 import { MODELS, getModel } from '../data/models'
 import { describeWeather, windDirection } from '../data/weatherCodes'
+import { useIndexSources } from '../hooks/useWeather'
 import { currentHourIndex, formatDay } from '../utils/time'
+import { ConvectionPanel } from './ConvectionPanel'
 import { ForecastChart, type ChartSeries } from './ForecastChart'
 
 interface Props {
@@ -15,6 +17,8 @@ interface Props {
 }
 
 const HOURS = 48
+const ALL_MODEL_IDS = MODELS.map((m) => m.id)
+type Tab = 'general' | 'convection'
 const fmt = (v: number | null | undefined, digits = 0) => (v == null ? '–' : v.toFixed(digits))
 
 /** Dispersión de la máxima de hoy entre modelos: indica cuánto coinciden */
@@ -30,6 +34,9 @@ function modelAgreement(forecast: Record<string, ModelSeries>) {
 
 export function LocationPanel({ location, modelId, current, forecast, forecastError }: Props) {
   const [compare, setCompare] = useState(false)
+  const [tab, setTab] = useState<Tab>('general')
+  // Los índices solo se descargan al abrir la pestaña de convección
+  const indices = useIndexSources(location, ALL_MODEL_IDS, tab === 'convection')
   const model = getModel(modelId)
   const series = forecast?.[modelId]
   const weather = describeWeather(current?.weather_code, current?.is_day !== 0)
@@ -112,50 +119,65 @@ export function LocationPanel({ location, modelId, current, forecast, forecastEr
         </dl>
       </section>
 
-      <section>
-        <div className="section-title">
-          <h3>Próximas 48 horas</h3>
-          <label className="toggle">
-            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
-            Comparar modelos
-          </label>
-        </div>
-        {forecastError && <p className="error">No se pudo cargar la previsión: {forecastError}</p>}
-        {!forecast && !forecastError && <p className="muted">Cargando previsión…</p>}
-        {chart}
-        {agreement && (
-          <p className="agreement">
-            Acuerdo entre modelos: <strong className={`agreement--${agreement.level}`}>{agreement.level}</strong>{' '}
-            <span className="muted">
-              (la máxima de hoy varía {agreement.spread.toFixed(1)}° entre {agreement.count} modelos)
-            </span>
-          </p>
-        )}
-      </section>
+      <div className="tabs" role="tablist" aria-label="Vista">
+        <button type="button" role="tab" aria-selected={tab === 'general'} onClick={() => setTab('general')}>
+          General
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'convection'} onClick={() => setTab('convection')}>
+          ⚡ Convección
+        </button>
+      </div>
 
-      {series && (
-        <section>
-          <h3>Próximos 7 días · {model.name}</h3>
-          <ul className="daily">
-            {series.daily.time.map((day, i) => {
-              const d = describeWeather(series.daily.weather_code[i])
-              return (
-                <li key={day}>
-                  <span className="daily__day">{i === 0 ? 'Hoy' : formatDay(day)}</span>
-                  <span className="daily__icon" title={d.label}>
-                    {d.icon}
-                  </span>
-                  <span className="daily__temps">
-                    <strong>{fmt(series.daily.temperature_2m_max[i])}°</strong>{' '}
-                    <span className="muted">{fmt(series.daily.temperature_2m_min[i])}°</span>
-                  </span>
-                  <span className="daily__rain">💧 {fmt(series.daily.precipitation_sum[i], 1)} mm</span>
-                  <span className="daily__wind">💨 {fmt(series.daily.wind_gusts_10m_max[i])} km/h</span>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
+      {tab === 'convection' ? (
+        <ConvectionPanel modelId={modelId} sources={indices.data} error={indices.error} />
+      ) : (
+        <>
+          <section>
+            <div className="section-title">
+              <h3>Próximas 48 horas</h3>
+              <label className="toggle">
+                <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
+                Comparar modelos
+              </label>
+            </div>
+            {forecastError && <p className="error">No se pudo cargar la previsión: {forecastError}</p>}
+            {!forecast && !forecastError && <p className="muted">Cargando previsión…</p>}
+            {chart}
+            {agreement && (
+              <p className="agreement">
+                Acuerdo entre modelos: <strong className={`agreement--${agreement.level}`}>{agreement.level}</strong>{' '}
+                <span className="muted">
+                  (la máxima de hoy varía {agreement.spread.toFixed(1)}° entre {agreement.count} modelos)
+                </span>
+              </p>
+            )}
+          </section>
+
+          {series && (
+            <section>
+              <h3>Próximos 7 días · {model.name}</h3>
+              <ul className="daily">
+                {series.daily.time.map((day, i) => {
+                  const d = describeWeather(series.daily.weather_code[i])
+                  return (
+                    <li key={day}>
+                      <span className="daily__day">{i === 0 ? 'Hoy' : formatDay(day)}</span>
+                      <span className="daily__icon" title={d.label}>
+                        {d.icon}
+                      </span>
+                      <span className="daily__temps">
+                        <strong>{fmt(series.daily.temperature_2m_max[i])}°</strong>{' '}
+                        <span className="muted">{fmt(series.daily.temperature_2m_min[i])}°</span>
+                      </span>
+                      <span className="daily__rain">💧 {fmt(series.daily.precipitation_sum[i], 1)} mm</span>
+                      <span className="daily__wind">💨 {fmt(series.daily.wind_gusts_10m_max[i])} km/h</span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          )}
+        </>
       )}
     </aside>
   )

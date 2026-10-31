@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   fetchCurrentForAll,
   fetchForecastByModel,
+  fetchIndexSources,
   type CurrentConditions,
+  type IndexSeries,
   type ModelSeries,
 } from '../api/openMeteo'
 import type { Location } from '../data/locations'
@@ -66,4 +68,14 @@ export function useForecast(location: Location, modelIds: string[]) {
     [location, key],
   )
   return useAutoRefresh<Record<string, ModelSeries>>(load, THIRTY_MINUTES)
+}
+
+export function useIndexSources(location: Location, modelIds: string[], enabled: boolean) {
+  const key = modelIds.join(',')
+  const load = useCallback(
+    (signal: AbortSignal) =>
+      enabled ? fetchIndexSources(location, key.split(','), signal) : Promise.resolve(null),
+    [location, key, enabled],
+  )
+  return useAutoRefresh<Record<string, IndexSeries> | null>(load, THIRTY_MINUTES)
 }

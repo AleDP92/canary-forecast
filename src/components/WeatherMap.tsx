@@ -5,11 +5,40 @@ import { MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-le
 import type { CurrentConditions } from '../api/openMeteo'
 import { LOCATIONS, MAP_BOUNDS, type Location } from '../data/locations'
 import { describeWeather } from '../data/weatherCodes'
+import { RADAR_MAX_NATIVE_ZOOM, type RadarFrame } from '../hooks/useRadar'
 
 interface Props {
   current: Record<string, CurrentConditions> | null
   selectedId: string
   onSelect: (id: string) => void
+}
+
+interface MapProps extends Props {
+  /** Fotogramas del radar; vacío si el radar está desactivado */
+  radarFrames: RadarFrame[]
+  radarIndex: number
+}
+
+/**
+ * Se montan todos los fotogramas a la vez y solo el actual es visible:
+ * así las imágenes ya están cargadas cuando se anima.
+ */
+function RadarLayers({ frames, index }: { frames: RadarFrame[]; index: number }) {
+  return (
+    <>
+      {frames.map((f, i) => (
+        <TileLayer
+          key={f.url}
+          url={f.url}
+          opacity={i === index ? 0.8 : 0}
+          zIndex={10}
+          maxNativeZoom={RADAR_MAX_NATIVE_ZOOM}
+          maxZoom={18}
+          attribution='Radar: <a href="https://www.rainviewer.com/">RainViewer</a> · AEMET'
+        />
+      ))}
+    </>
+  )
 }
 
 /** Color de fondo según la temperatura */
@@ -68,13 +97,14 @@ function Markers({ current, selectedId, onSelect }: Props) {
   )
 }
 
-export function WeatherMap(props: Props) {
+export function WeatherMap({ radarFrames, radarIndex, ...props }: MapProps) {
   return (
     <MapContainer bounds={MAP_BOUNDS} boundsOptions={{ padding: [24, 24] }} minZoom={6} className="map" scrollWheelZoom>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <RadarLayers frames={radarFrames} index={radarIndex} />
       <Markers {...props} />
     </MapContainer>
   )

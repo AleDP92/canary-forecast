@@ -15,24 +15,53 @@ interface Props {
   /** Precipitación (mm) que se dibuja como barras */
   bars?: (number | null)[]
   unit: string
+  /** Decimales en el recuadro de valores */
+  digits?: number
+  /** Amplitud mínima del eje Y (evita exagerar variaciones pequeñas) */
+  minSpan?: number
+  /** Incluir siempre el 0 en el eje Y */
+  zeroBased?: boolean
+  /** Líneas horizontales de referencia (umbrales) */
+  thresholds?: { value: number; color: string }[]
 }
 
 const H = 240
-const PAD = { top: 16, right: 36, bottom: 28, left: 36 }
+const PAD = { top: 16, right: 36, bottom: 28, left: 44 }
 
-function niceRange(values: number[]): [number, number] {
-  if (!values.length) return [0, 1]
-  let min = Math.floor(Math.min(...values))
-  let max = Math.ceil(Math.max(...values))
-  if (max - min < 4) {
-    const mid = (max + min) / 2
-    min = Math.floor(mid - 2)
-    max = Math.ceil(mid + 2)
-  }
-  return [min, max]
+/** Paso "bonito" (1, 2, 5 × 10ⁿ) para unas 4–6 líneas de referencia */
+function niceStep(range: number): number {
+  const raw = range / 5
+  const pow = 10 ** Math.floor(Math.log10(raw))
+  const f = raw / pow
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow
 }
 
-export function ForecastChart({ times, series, bars, unit }: Props) {
+function niceRange(values: number[], minSpan: number, zeroBased: boolean) {
+  let lo = values.length ? Math.min(...values) : 0
+  let hi = values.length ? Math.max(...values) : minSpan
+  if (zeroBased) {
+    lo = Math.min(0, lo)
+    hi = Math.max(0, hi)
+  }
+  if (hi - lo < minSpan) {
+    const mid = (hi + lo) / 2
+    lo = zeroBased && lo >= 0 ? 0 : mid - minSpan / 2
+    hi = lo + minSpan
+  }
+  const step = niceStep(hi - lo)
+  return { min: Math.floor(lo / step) * step, max: Math.ceil(hi / step) * step, step }
+}
+
+export function ForecastChart({
+  times,
+  series,
+  bars,
+  unit,
+  digits = 1,
+  minSpan = 4,
+  zeroBased = false,
+  thresholds = [],
+}: Props) {
   const [hover, setHover] = useState<number | null>(null)
   // El ancho del SVG sigue al contenedor para que el texto no se encoja en móvil
   const ref = useRef<HTMLDivElement>(null)
@@ -46,7 +75,7 @@ export function ForecastChart({ times, series, bars, unit }: Props) {
   }, [])
   const n = times.length
   const all = series.flatMap((s) => s.values.filter((v): v is number => v != null))
-  const [min, max] = niceRange(all)
+  const { min, max, step } = niceRange(all, minSpan, zeroBased)
   const barMax = Math.max(2, ...(bars ?? []).map((v) => v ?? 0))
 
   const innerW = W - PAD.left - PAD.right
@@ -69,14 +98,16 @@ export function ForecastChart({ times, series, bars, unit }: Props) {
     return d
   }
 
-  // Paso entero "bonito" (1, 2 o 5 grados) para unas 4–6 líneas de referencia
-  const step = [1, 2, 5, 10].find((s) => (max - min) / s <= 6) ?? 10
   const yTicks: number[] = []
-  for (let v = Math.ceil(min / step) * step; v <= max; v += step) yTicks.push(v)
+  for (let v = min; v <= max + step / 2; v += step) yTicks.push(Number(v.toPrecision(6)))
+  const axisUnit = unit.length <= 2 ? unit : ''
 
-  const dayStarts = times
-    .map((t, i) => ({ t, i }))
-    .filter(({ t, i }) => i === 0 || t.endsWith('T00:00'))
+  const midnights = times.map((t, i) => ({ t, i })).filter(({ t }) => t.endsWith('T00:00'))
+  // La etiqueta del primer día solo si cabe antes de la siguiente medianoche
+  const dayStarts =
+    n && (!midnights.length || x(midnights[0].i) - x(0) >= 60)
+      ? [{ t: times[0], i: 0 }, ...midnights]
+      : midnights
 
   const onMove = (e: MouseEvent<SVGRectElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -94,10 +125,24 @@ export function ForecastChart({ times, series, bars, unit }: Props) {
             <line className="chart__grid" x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} />
             <text className="chart__label" x={PAD.left - 6} y={y(v) + 4} textAnchor="end">
               {v}
-              {unit}
+              {axisUnit}
             </text>
           </g>
         ))}
+        {thresholds
+          .filter((t) => t.value > min && t.value < max)
+          .map((t) => (
+            <line
+              key={t.value}
+              x1={PAD.left}
+              x2={W - PAD.right}
+              y1={y(t.value)}
+              y2={y(t.value)}
+              stroke={t.color}
+              strokeDasharray="6 4"
+              strokeOpacity={0.8}
+            />
+          ))}
         {dayStarts.map(({ t, i }) => (
           <g key={t}>
             {i > 0 && <line className="chart__day" x1={x(i)} x2={x(i)} y1={PAD.top} y2={H - PAD.bottom} />}
@@ -163,7 +208,7 @@ export function ForecastChart({ times, series, bars, unit }: Props) {
             {series.map((s) => (
               <span key={s.id} className={s.emphasis ? 'tooltip__item--emphasis' : undefined}>
                 <i style={{ background: s.color }} />
-                {s.name}: {s.values[hover] == null ? '–' : `${s.values[hover]!.toFixed(1)}${unit}`}
+                {s.name}: {s.values[hover] == null ? '–' : `${s.values[hover]!.toFixed(digits)}${unit.length > 2 ? ' ' : ''}${unit}`}
               </span>
             ))}
             {bars && <span>💧 {(bars[hover] ?? 0).toFixed(1)} mm</span>}

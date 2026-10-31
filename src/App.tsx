@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { LocationPanel } from './components/LocationPanel'
 import { ModelSelector } from './components/ModelSelector'
+import { RadarControls } from './components/RadarControls'
 import { WeatherMap } from './components/WeatherMap'
 import { DEFAULT_LOCATION_ID, LOCATIONS } from './data/locations'
 import { DEFAULT_MODEL_ID, MODELS } from './data/models'
+import { useRadar } from './hooks/useRadar'
 import { useCurrentForAll, useForecast } from './hooks/useWeather'
 import { formatClock } from './utils/time'
 import './App.css'
@@ -23,13 +25,17 @@ export default function App() {
   )
   const location = LOCATIONS.find((l) => l.id === locationId) ?? LOCATIONS[0]
 
+  const [radarOn, setRadarOn] = useState(() => new URLSearchParams(window.location.search).has('radar'))
+  const radar = useRadar(radarOn)
+
   const current = useCurrentForAll(LOCATIONS, modelId)
   const forecast = useForecast(location, ALL_MODEL_IDS)
 
   useEffect(() => {
     const params = new URLSearchParams({ modelo: modelId, lugar: locationId })
+    if (radarOn) params.set('radar', '1')
     window.history.replaceState(null, '', `?${params}`)
-  }, [modelId, locationId])
+  }, [modelId, locationId, radarOn])
 
   const reloadAll = () => {
     current.reload()
@@ -60,22 +66,51 @@ export default function App() {
       {current.error && <p className="error">No se pudieron cargar los datos del mapa: {current.error}</p>}
 
       <main className="layout">
-        <div className="map-wrap">
-          <WeatherMap current={current.data} selectedId={locationId} onSelect={setLocationId} />
-          <label className="location-picker">
-            <span className="sr-only">Ubicación</span>
-            <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-              {[...new Set(LOCATIONS.map((l) => l.island))].map((island) => (
-                <optgroup key={island} label={island}>
-                  {LOCATIONS.filter((l) => l.island === island).map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
+        <div className={`map-wrap${radarOn ? ' map-wrap--radar' : ''}`}>
+          <WeatherMap
+            current={current.data}
+            selectedId={locationId}
+            onSelect={setLocationId}
+            radarFrames={radarOn ? radar.frames : []}
+            radarIndex={radar.index}
+          />
+          <div className="map-toolbar">
+            <button
+              type="button"
+              className={`radar-toggle${radarOn ? ' radar-toggle--active' : ''}`}
+              aria-pressed={radarOn}
+              onClick={() => {
+                setRadarOn(!radarOn)
+                radar.setPlaying(!radarOn)
+              }}
+            >
+              🌧️ Radar
+            </button>
+            <label className="location-picker">
+              <span className="sr-only">Ubicación</span>
+              <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+                {[...new Set(LOCATIONS.map((l) => l.island))].map((island) => (
+                  <optgroup key={island} label={island}>
+                    {LOCATIONS.filter((l) => l.island === island).map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+          </div>
+          {radarOn && (
+            <RadarControls
+              frames={radar.frames}
+              index={radar.index}
+              onIndex={radar.setIndex}
+              playing={radar.playing}
+              onPlaying={radar.setPlaying}
+              error={radar.error}
+            />
+          )}
         </div>
         <LocationPanel
           location={location}
